@@ -42,7 +42,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Next.js dev server
+    allow_origins=[
+        "http://localhost:3000",
+        "https://*.vercel.app",
+        "*",  # temporary — tighten after deployment confirmed working
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -337,6 +341,71 @@ async def get_market_sentiment():
     }
 
 # ── Agent Orchestration Endpoint ─────────────────────────────────
+
+@app.get("/narrative/{ticker}")
+async def get_narrative_timeline(
+    ticker: str,
+    force_refresh: bool = False
+):
+    """
+    Returns longitudinal narrative signals for a ticker.
+    First call: downloads + processes SEC filings (30-60 seconds).
+    Subsequent calls: returns from SQLite cache (instant).
+    """
+    from narrative.narrative_service import narrative_service
+    import dataclasses
+
+    signals = await narrative_service.get_narrative_timeline(
+        ticker.upper(), force_refresh
+    )
+
+    if not signals:
+        return {
+            "ticker": ticker.upper(),
+            "quarters": [],
+            "message": "No filings found. Try a major US ticker like AAPL or MSFT."
+        }
+
+    return {
+        "ticker":   ticker.upper(),
+        "quarters": [dataclasses.asdict(s) for s in signals],
+        "summary": {
+            "total_quarters": len(signals),
+            "tone_trend": [s.management_tone for s in signals],
+            "ai_trend":   [s.ai_monetization for s in signals],
+            "margin_trend": [s.margin_language for s in signals],
+        }
+    }
+
+
+@app.get("/narrative/{ticker}/preprocess")
+async def preprocess_narrative(ticker: str):
+    """
+    Pre-processes filings in the background.
+    Call this for AAPL, NVDA, MSFT, META before the demo
+    so the timeline loads instantly.
+    """
+    from narrative.narrative_service import narrative_service
+    import asyncio
+
+    async def background_process():
+        await narrative_service.get_narrative_timeline(
+            ticker.upper(), force_refresh=True
+        )
+
+    asyncio.create_task(background_process())
+    return {
+        "message": f"Processing {ticker.upper()} in background. "
+                   f"Check /narrative/{ticker} in ~60 seconds."
+    }
+
+@app.get("/recommendations/{ticker}")
+async def get_recommendations(ticker: str):
+    from providers.market_data_service import market_data_service
+    result = await market_data_service.get_recommendations(ticker.upper())
+    if not result:
+        return {"error": "No recommendations available"}
+    return result.model_dump()
 
 @app.get("/analyze/{ticker}")
 async def analyze_ticker(ticker: str):

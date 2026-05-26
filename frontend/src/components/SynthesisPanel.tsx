@@ -1,12 +1,15 @@
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { SynthesisData, AgentData } from '@/hooks/useAnalysis';
+import AnalystPanel from '@/components/AnalystPanel';
+
 interface SynthesisPanelProps {
   synthesis: SynthesisData;
   agents: Record<string, AgentData>;
+  ticker: string;
 }
 
-export function SynthesisPanel({ synthesis, agents }: SynthesisPanelProps) {
+export function SynthesisPanel({ synthesis, agents, ticker }: SynthesisPanelProps) {
   const [displayScore, setDisplayScore] = React.useState(0);
 
   React.useEffect(() => {
@@ -37,7 +40,7 @@ export function SynthesisPanel({ synthesis, agents }: SynthesisPanelProps) {
   const status = getStatus(synthesis.divergence_score);
   
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="grid gap-6 lg:grid-cols-3 md:grid-cols-2">
       <Card className="bg-card/50 backdrop-blur-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -65,6 +68,8 @@ export function SynthesisPanel({ synthesis, agents }: SynthesisPanelProps) {
           </div>
         </CardContent>
       </Card>
+
+      <AnalystPanel ticker={ticker} />
 
       <Card className="bg-card/50 backdrop-blur-sm">
         <CardHeader>

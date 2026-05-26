@@ -21,6 +21,7 @@ export function TopNavBar() {
     { name: 'Overview', path: '/overview' },
     { name: 'Divergence', path: '/divergence' },
     { name: 'Agent Details', path: '/agent-details' },
+    { name: 'Narrative', path: '/narrative' },
   ];
 
   return (
