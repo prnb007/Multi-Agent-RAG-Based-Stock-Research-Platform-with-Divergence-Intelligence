@@ -1,57 +1,76 @@
-import logging
-import yfinance as yf
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
+"""
+MacroAgent
+Uses SectorComparisonService for ALL sector/peer analysis.
+NEVER calls yfinance or fetches prices directly.
+"""
 
-from agents.base import BaseAgent, AgentOutput
-from fetchers import fetch_peers, fetch_sector_etf_performance
+import logging
+from agents.base import AgentOutput, call_llm
+from providers.market_data_service import market_data_service
+from analytics.sector_comparison_service import sector_comparison_service
 
 logger = logging.getLogger(__name__)
 
-class MacroAgent(BaseAgent):
+
+class MacroAgent:
+    name = "macro"
+
+    def __init__(self, ticker: str):
+        self.ticker = ticker.upper()
+
     async def analyze(self) -> AgentOutput:
         logger.info(f"[{self.ticker}] MacroAgent starting analysis...")
+
         try:
-            # Sector ETF performance (contains ticker return too)
-            etf_perf = fetch_sector_etf_performance(self.ticker)
-            
-            # Peer performance
-            peers = fetch_peers(self.ticker)
-            peer_perf = {}
-            for peer in peers:
-                try:
-                    hist = yf.download(peer, period="3mo", progress=False)["Close"]
-                    if not hist.empty:
-                        ret = float((hist.iloc[-1] - hist.iloc[0]) / hist.iloc[0] * 100)
-                        peer_perf[peer] = round(ret, 2)
-                except Exception:
-                    pass
-            
-            macro_data = {
-                "sector_etf_comparison": etf_perf,
-                "peer_3mo_returns": peer_perf
-            }
-            
-            llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
-            structured_llm = llm.with_structured_output(AgentOutput)
-            
-            prompt = ChatPromptTemplate.from_messages([
-                ("system", "You are an expert macroeconomic and relative value analyst. Your job is to compare a stock's recent performance against its sector ETF and top peers. Evaluate if it's outperforming or underperforming the broader sector and its competitors. Return a score from -1.0 (severe underperformance) to +1.0 (strong outperformance), a confidence score, a short summary, and evidence bullet points."),
-                ("user", "Analyze the relative performance for {ticker}:\n\n{macro_data}")
-            ])
-            
-            chain = prompt | structured_llm
-            result = await chain.ainvoke({
-                "ticker": self.ticker,
-                "macro_data": str(macro_data)
-            })
-            
-            return result
+            overview = await market_data_service.get_company_overview(self.ticker)
+            comparison = await sector_comparison_service.compare(
+                self.ticker, overview.sector
+            )
+
+            system_prompt = (
+                "You are a macro/sector analyst. Compare a stock's performance to its "
+                "sector ETF and peers. Return a JSON object with this exact shape: "
+                '{{"score": <float -1.0 to 1.0>, "confidence": <float 0.0 to 1.0>, '
+                '"summary": "<2-3 sentences>", "evidence": ["bullet 1", "bullet 2", ...]}}'
+            )
+
+            user_prompt = f"""
+Analyze {self.ticker}'s position vs its sector and peers.
+
+SECTOR: {comparison.sector}
+SECTOR ETF: {comparison.sector_etf}
+
+3-MONTH RETURNS:
+- {self.ticker}: {comparison.ticker_3mo_return}%
+- {comparison.sector_etf} (sector ETF): {comparison.etf_3mo_return}%
+- Outperformance vs ETF: {comparison.outperformance}%
+
+PEER COMPARISON:
+- Peers: {comparison.peer_tickers}
+- Peer average return: {comparison.peer_avg_return}%
+- Outperformance vs peers: {comparison.vs_peers}%
+
+RELATIVE STRENGTH LABEL: {comparison.relative_strength}
+PRE-COMPUTED MACRO SCORE: {comparison.macro_score}
+
+Provide your final macro assessment as JSON.
+Score: positive = outperforming sector/peers, negative = underperforming.
+Evidence: cite specific percentage comparisons.
+"""
+
+            result = await call_llm(system_prompt, user_prompt)
+
+            return AgentOutput(
+                agent=self.name,
+                score=float(result.get("score", comparison.macro_score)),
+                confidence=float(result.get("confidence", 0.7)),
+                summary=result.get("summary", ""),
+                evidence=result.get("evidence", []),
+            )
+
         except Exception as e:
             logger.error(f"[{self.ticker}] MacroAgent failed: {e}")
             return AgentOutput(
-                score=0.0,
-                confidence=0.0,
-                summary=f"Analysis failed: {str(e)}",
-                evidence=[]
+                agent=self.name, score=0.0, confidence=0.0,
+                summary=f"Analysis failed: {e}", evidence=[]
             )

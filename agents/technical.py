@@ -1,75 +1,91 @@
-import logging
-import pandas_ta as ta
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
+"""
+TechnicalAgent
+Uses TechnicalIndicatorService for ALL indicator calculations.
+Uses MarketDataService for price history.
+NEVER calls yfinance or computes indicators inline.
+"""
 
-from agents.base import BaseAgent, AgentOutput
-from fetchers import fetch_price_history
+import logging
+from agents.base import AgentOutput, call_llm
+from providers.market_data_service import market_data_service
+from analytics.technical_indicator_service import technical_indicator_service
 
 logger = logging.getLogger(__name__)
 
-class TechnicalAgent(BaseAgent):
+
+class TechnicalAgent:
+    name = "technical"
+
+    def __init__(self, ticker: str):
+        self.ticker = ticker.upper()
+
     async def analyze(self) -> AgentOutput:
         logger.info(f"[{self.ticker}] TechnicalAgent starting analysis...")
+
         try:
-            # Fetch 6mo history
-            df = fetch_price_history(self.ticker, period="6mo")
-            
-            if df.empty or len(df) < 50:
+            price_history = await market_data_service.get_price_history(self.ticker)
+            signals = technical_indicator_service.compute(price_history)
+
+            if signals.current_price is None:
                 return AgentOutput(
-                    score=0.0,
-                    confidence=0.1,
-                    summary="Not enough price history for technical analysis.",
+                    agent=self.name, score=0.0, confidence=0.0,
+                    summary="Insufficient price data for analysis",
                     evidence=[]
                 )
-            
-            # Calculate technical indicators using pandas-ta
-            df.ta.rsi(length=14, append=True)
-            df.ta.macd(fast=12, slow=26, signal=9, append=True)
-            df.ta.bbands(length=20, std=2, append=True)
-            
-            # Get the most recent row
-            latest = df.iloc[-1]
-            
-            rsi_key = [c for c in df.columns if 'RSI' in c][0]
-            macd_key = [c for c in df.columns if 'MACD' in c and 'MACDh' not in c and 'MACDs' not in c][0]
-            macds_key = [c for c in df.columns if 'MACDs' in c][0]
-            bbl_key = [c for c in df.columns if 'BBL' in c][0]
-            bbu_key = [c for c in df.columns if 'BBU' in c][0]
-            bbm_key = [c for c in df.columns if 'BBM' in c][0]
-            
-            tech_data = {
-                "latest_close": latest["Close"],
-                "rsi_14": latest[rsi_key],
-                "macd": latest[macd_key],
-                "macd_signal": latest[macds_key],
-                "bb_lower": latest[bbl_key],
-                "bb_upper": latest[bbu_key],
-                "bb_middle": latest[bbm_key],
-                "volume": latest["Volume"],
-                "avg_volume_14": df["Volume"].rolling(14).mean().iloc[-1]
-            }
-            
-            llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
-            structured_llm = llm.with_structured_output(AgentOutput)
-            
-            prompt = ChatPromptTemplate.from_messages([
-                ("system", "You are an expert technical analysis AI agent. Analyze the provided technical indicators (RSI, MACD, Bollinger Bands, Volume) to determine the short-to-medium term momentum and trend. Return a score from -1.0 (bearish, overbought, downtrend) to +1.0 (bullish, oversold, uptrend), a confidence score, a short summary, and evidence bullet points."),
-                ("user", "Analyze the technical indicators for {ticker}:\n\n{tech_data}")
-            ])
-            
-            chain = prompt | structured_llm
-            result = await chain.ainvoke({
-                "ticker": self.ticker,
-                "tech_data": str(tech_data)
-            })
-            
-            return result
+
+            system_prompt = (
+                "You are a technical analyst. Analyze technical indicators and return a JSON object "
+                "with this exact shape: "
+                '{{"score": <float -1.0 to 1.0>, "confidence": <float 0.0 to 1.0>, '
+                '"summary": "<2-3 sentences>", "evidence": ["bullet 1", "bullet 2", ...]}}'
+            )
+
+            user_prompt = f"""
+Analyze technical indicators for {self.ticker}.
+
+PRICE: ${signals.current_price}
+6-MONTH RETURN: {signals.six_month_return}%
+
+MOMENTUM INDICATORS:
+- RSI (14): {signals.rsi}
+- MACD: {signals.macd}
+- MACD signal: {signals.macd_signal}
+- MACD histogram: {signals.macd_histogram}
+
+MOVING AVERAGES:
+- EMA 20: {signals.ema_20}
+- EMA 50: {signals.ema_50}
+- SMA 200: {signals.sma_200}
+
+BOLLINGER BANDS:
+- Upper: {signals.bb_upper}
+- Middle: {signals.bb_middle}
+- Lower: {signals.bb_lower}
+- Price position: {signals.price_vs_bb}
+
+VOLUME: {signals.volume_trend}
+OVERALL TREND: {signals.trend}
+PRE-COMPUTED MOMENTUM SCORE: {signals.momentum_score}
+
+Provide your final technical assessment as JSON.
+Score: positive = bullish technicals, negative = bearish technicals.
+Confidence: how strong and consistent the signals are.
+Evidence: cite specific numbers (RSI, MACD, position vs bands, etc.)
+"""
+
+            result = await call_llm(system_prompt, user_prompt)
+
+            return AgentOutput(
+                agent=self.name,
+                score=float(result.get("score", signals.momentum_score)),
+                confidence=float(result.get("confidence", 0.7)),
+                summary=result.get("summary", ""),
+                evidence=result.get("evidence", []),
+            )
+
         except Exception as e:
             logger.error(f"[{self.ticker}] TechnicalAgent failed: {e}")
             return AgentOutput(
-                score=0.0,
-                confidence=0.0,
-                summary=f"Analysis failed: {str(e)}",
-                evidence=[]
+                agent=self.name, score=0.0, confidence=0.0,
+                summary=f"Analysis failed: {e}", evidence=[]
             )

@@ -65,6 +65,72 @@ def health():
     return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
 
 
+@app.get("/health/providers")
+def provider_health():
+    from providers.health_monitor import health_monitor
+    from providers.cache_service import cache_service
+    return {
+        "providers": health_monitor.get_all_stats(),
+        "cache": cache_service.stats(),
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+@app.get("/test/provider/{ticker}")
+async def test_provider(ticker: str):
+    from providers.market_data_service import market_data_service
+    from providers.health_monitor import health_monitor
+    from providers.cache_service import cache_service
+
+    overview = await market_data_service.get_company_overview(ticker.upper())
+    price    = await market_data_service.get_price_history(ticker.upper())
+
+    return {
+        "company": overview.model_dump(),
+        "price_points": len(price.points),
+        "latest_close": price.points[0].close if price.points else None,
+        "provider_used": overview.provider,
+        "provider_health": health_monitor.get_all_stats(),
+        "cache_stats": cache_service.stats(),
+    }
+
+@app.get("/test/analytics/{ticker}")
+async def test_analytics(ticker: str):
+    from providers.market_data_service import market_data_service
+    from analytics.technical_indicator_service import technical_indicator_service
+    from analytics.financial_analysis_service import financial_analysis_service
+    from analytics.news_aggregation_service import news_aggregation_service
+    from analytics.sector_comparison_service import sector_comparison_service
+    import dataclasses
+
+    ticker = ticker.upper()
+
+    overview  = await market_data_service.get_company_overview(ticker)
+    prices    = await market_data_service.get_price_history(ticker)
+    income    = await market_data_service.get_income_statement(ticker)
+    balance   = await market_data_service.get_balance_sheet(ticker)
+    cashflow  = await market_data_service.get_cash_flow(ticker)
+
+    technical = technical_indicator_service.compute(prices)
+    financial = financial_analysis_service.compute(
+        overview, income, balance, cashflow
+    )
+    news      = await news_aggregation_service.get_company_news(
+        ticker, overview.name
+    )
+    sentiment = news_aggregation_service.compute_sentiment_summary(news)
+    sector    = await sector_comparison_service.compare(
+        ticker, overview.sector
+    )
+
+    return {
+        "technical": dataclasses.asdict(technical),
+        "financial": dataclasses.asdict(financial),
+        "news_count": len(news),
+        "sentiment": sentiment,
+        "sector": dataclasses.asdict(sector),
+    }
+
+
 # ── Day 1 test endpoint ───────────────────────────────────────────
 
 @app.get("/data/{ticker}")
@@ -187,13 +253,8 @@ async def analyze_ticker(ticker: str):
             results[name] = result
             
             # Yield the SSE event
-            data = {
-                "agent": name,
-                "score": result.score,
-                "confidence": result.confidence,
-                "summary": result.summary,
-                "evidence": result.evidence
-            }
+            data = result.model_dump()
+            data["agent"] = name
             yield f"event: agent_complete\ndata: {json.dumps(data)}\n\n"
                 
         # Now run the synthesis agent
@@ -201,12 +262,7 @@ async def analyze_ticker(ticker: str):
             synthesis_agent = SynthesisAgent(ticker)
             synthesis_result = await synthesis_agent.analyze(results)
             
-            synthesis_data = {
-                "divergence_score": synthesis_result.divergence_score,
-                "highest_gap_pair": synthesis_result.highest_gap_pair,
-                "bull_thesis": synthesis_result.bull_thesis,
-                "bear_thesis": synthesis_result.bear_thesis
-            }
+            synthesis_data = synthesis_result.model_dump()
             yield f"event: report_complete\ndata: {json.dumps(synthesis_data)}\n\n"
         except Exception as e:
             logger.error(f"Error in synthesis agent: {e}")

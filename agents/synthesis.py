@@ -14,6 +14,7 @@ class SynthesisOutput(BaseModel):
     highest_gap_pair: str = Field(..., description="The pair of agents with the highest score difference (e.g. 'Fundamentals vs Technical').")
     bull_thesis: str = Field(..., description="The synthesized bull thesis with cited evidence.")
     bear_thesis: str = Field(..., description="The synthesized bear thesis with cited evidence.")
+    overall_score: float = Field(0.0, description="Weighted average of agent scores.")
 
 class SynthesisAgent:
     def __init__(self, ticker: str):
@@ -89,9 +90,10 @@ class SynthesisAgent:
                 "context": context
             })
             
-            # Ensure the calculated divergence score and pair are used (the LLM might hallucinate them, let's force overwrite just in case)
+            # Ensure the calculated divergence score and pair are used
             result.divergence_score = round(divergence_score, 2)
             result.highest_gap_pair = highest_pair
+            result.overall_score = round(float(weighted_mean), 2)
             
             return result
         except Exception as e:
@@ -100,5 +102,6 @@ class SynthesisAgent:
                 divergence_score=0.0,
                 highest_gap_pair="Error",
                 bull_thesis=f"Analysis failed: {str(e)}",
-                bear_thesis=f"Analysis failed: {str(e)}"
+                bear_thesis=f"Analysis failed: {str(e)}",
+                overall_score=0.0
             )

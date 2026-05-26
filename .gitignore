@@ -1,1 +1,10 @@
 .env
+.venv/
+__pycache__/
+*.pyc
+.vscode/
+sec_filings/
+scratch/
+debug.py
+test_yf.py
+test_foundations.py
