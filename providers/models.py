@@ -90,3 +90,50 @@ class ProviderError(BaseModel):
     message: str
     timestamp: datetime
     ticker: Optional[str]
+
+class InsiderTransaction(BaseModel):
+    ticker: str
+    name: str                         # Insider's name
+    transaction_date: str
+    transaction_type: str             # "buy" | "sell" | "option_exercise" | "other"
+    shares: int
+    share_price: Optional[float]
+    total_value: Optional[float]
+    position: Optional[str]           # CEO, CFO, Director, etc.
+    provider: str
+    fetched_at: datetime
+
+class AnalystRecommendation(BaseModel):
+    ticker: str
+    period: str                       # YYYY-MM
+    strong_buy: int
+    buy: int
+    hold: int
+    sell: int
+    strong_sell: int
+    total: int
+    consensus_score: float            # -1.0 (strong sell) to +1.0 (strong buy)
+    provider: str
+    fetched_at: datetime
+
+class RealtimeQuote(BaseModel):
+    ticker: str
+    current_price: float
+    change: float                     # Absolute change vs prev close
+    percent_change: float
+    day_high: float
+    day_low: float
+    day_open: float
+    prev_close: float
+    timestamp: int                    # Unix timestamp
+    provider: str
+    fetched_at: datetime
+
+class SentimentSummary(BaseModel):
+    ticker: str
+    buzz_articles_in_last_week: int
+    news_score: float                 # 0 to 1, Finnhub's company news score
+    sector_average_buzz: Optional[float]
+    sector_average_news_score: Optional[float]
+    provider: str
+    fetched_at: datetime

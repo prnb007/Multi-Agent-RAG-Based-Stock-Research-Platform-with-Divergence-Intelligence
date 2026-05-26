@@ -12,7 +12,8 @@ from providers.provider_router import ProviderRouter
 from providers.cache_service import cache_service
 from providers.models import (
     CompanyOverview, PriceHistory,
-    IncomeStatement, BalanceSheet, CashFlowStatement, NewsItem
+    IncomeStatement, BalanceSheet, CashFlowStatement, NewsItem,
+    InsiderTransaction, AnalystRecommendation, RealtimeQuote
 )
 
 logger = logging.getLogger(__name__)
@@ -69,6 +70,38 @@ class MarketDataService:
             return cached
         result = await self._router.fetch("get_news", ticker, limit=limit)
         await cache_service.set("news", ticker, result)
+        return result
+
+    async def get_insider_trades(
+        self, ticker: str, limit: int = 20
+    ) -> list[InsiderTransaction]:
+        cached = await cache_service.get("insider_trades", ticker)
+        if cached:
+            return cached
+        result = await self._router.fetch("get_insider_trades", ticker, limit=limit)
+        await cache_service.set("insider_trades", ticker, result)
+        return result
+
+    async def get_peers(self, ticker: str) -> list[str]:
+        cached = await cache_service.get("peers", ticker)
+        if cached:
+            return cached
+        result = await self._router.fetch("get_peers", ticker)
+        await cache_service.set("peers", ticker, result)
+        return result
+
+    async def get_realtime_quote(self, ticker: str) -> RealtimeQuote:
+        # NO caching for realtime quote — it must be fresh every call
+        return await self._router.fetch("get_realtime_quote", ticker)
+
+    async def get_recommendations(
+        self, ticker: str
+    ) -> AnalystRecommendation:
+        cached = await cache_service.get("recommendations", ticker)
+        if cached:
+            return cached
+        result = await self._router.fetch("get_recommendations", ticker)
+        await cache_service.set("recommendations", ticker, result)
         return result
 
 

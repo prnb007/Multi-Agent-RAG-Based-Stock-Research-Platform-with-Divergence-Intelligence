@@ -11,6 +11,9 @@ TTL_PRICE_DATA      = 5 * 60       # 5 minutes
 TTL_COMPANY_OVERVIEW = 24 * 60 * 60 # 24 hours
 TTL_FINANCIALS      = 12 * 60 * 60  # 12 hours
 TTL_NEWS            = 15 * 60       # 15 minutes
+TTL_INSIDER         = 4  * 60 * 60  # 4 hours
+TTL_PEERS           = 24 * 60 * 60  # 24 hours
+TTL_RECOMMENDATIONS = 6  * 60 * 60  # 6 hours
 
 class CacheService:
     """
@@ -27,6 +30,9 @@ class CacheService:
         self._overview_cache = TTLCache(maxsize=500, ttl=TTL_COMPANY_OVERVIEW)
         self._financial_cache = TTLCache(maxsize=300, ttl=TTL_FINANCIALS)
         self._news_cache     = TTLCache(maxsize=200, ttl=TTL_NEWS)
+        self._insider_cache         = TTLCache(maxsize=300, ttl=TTL_INSIDER)
+        self._peers_cache           = TTLCache(maxsize=500, ttl=TTL_PEERS)
+        self._recommendations_cache = TTLCache(maxsize=300, ttl=TTL_RECOMMENDATIONS)
         self._lock = asyncio.Lock()
 
     def _get_cache(self, data_type: str) -> TTLCache:
@@ -37,6 +43,9 @@ class CacheService:
             "balance_sheet":     self._financial_cache,
             "cash_flow":         self._financial_cache,
             "news":              self._news_cache,
+            "insider_trades":    self._insider_cache,
+            "peers":             self._peers_cache,
+            "recommendations":   self._recommendations_cache,
         }.get(data_type, self._overview_cache)
 
     async def get(self, data_type: str, ticker: str) -> Optional[Any]:
@@ -69,6 +78,9 @@ class CacheService:
             "overview_cache": {"size": len(self._overview_cache), "maxsize": self._overview_cache.maxsize},
             "financial_cache":{"size": len(self._financial_cache),"maxsize": self._financial_cache.maxsize},
             "news_cache":     {"size": len(self._news_cache),     "maxsize": self._news_cache.maxsize},
+            "insider_cache":  {"size": len(self._insider_cache),  "maxsize": self._insider_cache.maxsize},
+            "peers_cache":    {"size": len(self._peers_cache),    "maxsize": self._peers_cache.maxsize},
+            "recommendations_cache": {"size": len(self._recommendations_cache), "maxsize": self._recommendations_cache.maxsize},
         }
 
 # Global singleton — import this everywhere

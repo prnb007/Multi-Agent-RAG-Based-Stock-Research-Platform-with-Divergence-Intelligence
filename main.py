@@ -16,16 +16,7 @@ from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from fetchers import (
-    fetch_stock_info,
-    fetch_price_history,
-    fetch_financials,
-    fetch_news,
-    fetch_sec_filings,
-    parse_insider_trades,
-    fetch_peers,
-    fetch_sector_etf_performance,
-)
+
 
 from agents.fundamentals import FundamentalsAgent
 from agents.sentiment import SentimentAgent
@@ -130,86 +121,220 @@ async def test_analytics(ticker: str):
         "sector": dataclasses.asdict(sector),
     }
 
+@app.get("/test/finnhub/{ticker}")
+async def test_finnhub(ticker: str):
+    from providers.finnhub_provider import FinnhubProvider
 
-# ── Day 1 test endpoint ───────────────────────────────────────────
-
-@app.get("/data/{ticker}")
-async def get_raw_data(ticker: str):
-    """
-    Test endpoint — verifies all data sources are working.
-    Returns raw data from yfinance, SEC, and NewsAPI.
-    This endpoint will be removed once agents are live.
-    """
-    ticker = ticker.upper().strip()
-    logger.info(f"Fetching raw data for {ticker}")
+    provider = FinnhubProvider()
+    ticker = ticker.upper()
 
     try:
-        # 1. Stock info + fundamentals
-        info = fetch_stock_info(ticker)
-    except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Ticker not found: {e}")
-
-    # 2. Price history (last 6 months, condensed)
-    try:
-        history = fetch_price_history(ticker, period="6mo")
-        price_summary = {
-            "latest_close": round(float(history["Close"].iloc[-1]), 2),
-            "6mo_high": round(float(history["High"].max()), 2),
-            "6mo_low": round(float(history["Low"].min()), 2),
-            "avg_volume": int(history["Volume"].mean()),
-            "data_points": len(history),
-        }
-    except Exception as e:
-        logger.warning(f"Price history failed: {e}")
-        price_summary = {}
-
-    # 3. News articles
-    news = fetch_news(ticker, info.name)
-
-    # 4. SEC filings (download, then list what we got)
-    try:
-        sec_paths = fetch_sec_filings(ticker)
-        sec_summary = {
-            "10-K_count": len(sec_paths.get("10-K", [])),
-            "10-Q_count": len(sec_paths.get("10-Q", [])),
-            "form4_count": len(sec_paths.get("4", [])),
-        }
-    except Exception as e:
-        logger.warning(f"SEC fetch failed: {e}")
-        sec_summary = {"error": str(e)}
-
-    # 5. Insider trades
-    try:
-        trades = parse_insider_trades(ticker)
-        insider_summary = {
-            "total_trades": len(trades),
-            "buys": sum(1 for t in trades if t.transaction_type == "Buy"),
-            "sells": sum(1 for t in trades if t.transaction_type == "Sell"),
-            "recent_trades": [t.model_dump() for t in trades[:5]],
-        }
-    except Exception as e:
-        logger.warning(f"Insider parse failed: {e}")
-        insider_summary = {}
-
-    # 6. Sector + peer performance
-    peers = fetch_peers(ticker)
-    macro = fetch_sector_etf_performance(ticker)
+        overview     = await provider.get_company_overview(ticker)
+        quote        = await provider.get_realtime_quote(ticker)
+        try:
+            prices = await provider.get_price_history(ticker)
+        except Exception as e:
+            prices = None
+            print(f"Candles failed (expected on free tier): {e}")
+        news         = await provider.get_news(ticker, limit=10)
+        insider      = await provider.get_insider_trades(ticker, limit=10)
+        peers        = await provider.get_peers(ticker)
+        recs         = await provider.get_recommendations(ticker)
+        sentiment    = await provider.get_sentiment_summary(ticker)
+    finally:
+        await provider.close()
 
     return {
-        "ticker": ticker,
-        "fetched_at": datetime.utcnow().isoformat(),
-        "company": info.model_dump(),
-        "price_summary": price_summary,
-        "news": {
-            "count": len(news),
-            "articles": [a.model_dump() for a in news[:5]],  # preview first 5
-        },
-        "sec_filings": sec_summary,
-        "insider_trades": insider_summary,
-        "peers": peers,
-        "macro": macro,
+        "overview":    overview.model_dump(),
+        "realtime":    quote.model_dump(),
+        "price_points": len(prices.points) if prices else 0,
+        "latest_close": prices.points[0].close if (prices and prices.points) else None,
+        "news_count":  len(news),
+        "first_headline": news[0].title if news else None,
+        "insider_count": len(insider),
+        "first_insider":  insider[0].model_dump() if insider else None,
+        "peers":          peers,
+        "recommendations": recs.model_dump() if recs else None,
+        "sentiment":       sentiment.model_dump() if sentiment else None,
     }
 
+
+@app.get("/test/fmp/{ticker}")
+async def test_fmp(ticker: str):
+    from providers.fmp_provider import FMPProvider
+
+    provider = FMPProvider()
+    ticker = ticker.upper()
+
+    try:
+        overview = await provider.get_company_overview(ticker)
+        income   = await provider.get_income_statement(ticker)
+        balance  = await provider.get_balance_sheet(ticker)
+        cashflow = await provider.get_cash_flow(ticker)
+    finally:
+        await provider.close()
+
+    return {
+        "overview":   overview.model_dump(),
+        "income":     income.model_dump()   if income   else None,
+        "balance":    balance.model_dump()  if balance  else None,
+        "cashflow":   cashflow.model_dump() if cashflow else None,
+    }
+
+
+@app.get("/quotes/batch")
+async def get_batch_quotes(tickers: str):
+    """
+    Returns realtime quotes for multiple tickers.
+    Usage: /quotes/batch?tickers=AAPL,MSFT,GOOGL,TSLA,NVDA
+    """
+    from providers.market_data_service import market_data_service
+    import asyncio
+
+    symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()][:20]
+    results = await asyncio.gather(*[
+        market_data_service.get_realtime_quote(s)
+        for s in symbols
+    ], return_exceptions=True)
+
+    return {
+        "quotes": [
+            r.model_dump() for r in results
+            if not isinstance(r, Exception)
+        ],
+        "failed": [
+            s for s, r in zip(symbols, results)
+            if isinstance(r, Exception)
+        ],
+    }
+
+@app.get("/news/market")
+async def get_market_news(limit: int = 8):
+    """
+    Fetches general market news from Finnhub.
+    Not ticker-specific — broad market headlines.
+    """
+    from providers.finnhub_provider import FinnhubProvider
+    import asyncio
+
+    provider = FinnhubProvider()
+    try:
+        data = await provider._get("/news", {"category": "general", "minId": 0})
+        articles = data if isinstance(data, list) else []
+        news = []
+        for a in articles[:limit]:
+            try:
+                import time as _time
+                pub_ts  = a.get("datetime", 0)
+                ago_sec = int(_time.time()) - pub_ts
+                if ago_sec < 3600:
+                    ago = f"{ago_sec // 60}m ago"
+                elif ago_sec < 86400:
+                    ago = f"{ago_sec // 3600}h ago"
+                else:
+                    ago = f"{ago_sec // 86400}d ago"
+
+                category = a.get("category", "general").upper()
+
+                news.append({
+                    "headline": a.get("headline", ""),
+                    "summary":  a.get("summary", ""),
+                    "source":   a.get("source", ""),
+                    "url":      a.get("url", ""),
+                    "category": category,
+                    "ago":      ago,
+                    "image":    a.get("image", ""),
+                })
+            except Exception:
+                continue
+        return {"articles": news}
+    finally:
+        await provider.close()
+
+@app.get("/market/sentiment")
+async def get_market_sentiment():
+    import asyncio, httpx, time as _time
+
+    ALL_TICKERS = ["SPY", "QQQ", "VXX", "AAPL", "MSFT", "NVDA",
+                   "GOOGL", "AMZN", "META", "TSLA", "JPM", "V", "JNJ"]
+    BREADTH_TICKERS = ["AAPL","MSFT","NVDA","GOOGL","AMZN",
+                       "META","TSLA","JPM","V","JNJ"]
+
+    # Reuse market_data_service realtime quotes with health monitoring
+    from providers.market_data_service import market_data_service
+
+    results = await asyncio.gather(*[
+        market_data_service.get_realtime_quote(t)
+        for t in ALL_TICKERS
+    ], return_exceptions=True)
+
+    quotes = {}
+    for ticker, result in zip(ALL_TICKERS, results):
+        if not isinstance(result, Exception):
+            quotes[ticker] = result
+
+    score = 50.0
+    signals = {}
+    breadth_pct = None
+
+    # Signal 1: VIX via VXX
+    vxx = quotes.get("VXX")
+    if vxx:
+        p = vxx.current_price
+        if p < 15:   score += 25; signals["volatility"] = "Extremely Low"
+        elif p < 20: score += 15; signals["volatility"] = "Low"
+        elif p < 25: score += 5;  signals["volatility"] = "Moderate"
+        elif p < 30: score -= 10; signals["volatility"] = "Elevated"
+        else:        score -= 20; signals["volatility"] = "High"
+
+    # Signal 2: SPY momentum
+    spy = quotes.get("SPY")
+    if spy:
+        pct = spy.percent_change
+        score += min(15, max(-15, pct * 4))
+        if pct > 1.0:    signals["momentum"] = "Strong"
+        elif pct > 0.2:  signals["momentum"] = "Positive"
+        elif pct > -0.2: signals["momentum"] = "Neutral"
+        elif pct > -1.0: signals["momentum"] = "Negative"
+        else:            signals["momentum"] = "Weak"
+
+    # Signal 3: Market breadth from screener stocks
+    breadth_quotes = [quotes[t] for t in BREADTH_TICKERS if t in quotes]
+    if breadth_quotes:
+        up_count = sum(1 for q in breadth_quotes if q.percent_change > 0)
+        breadth_pct = up_count / len(breadth_quotes)
+        score += (breadth_pct - 0.5) * 20
+        if breadth_pct >= 0.7:   signals["breadth"] = "Broad Advance"
+        elif breadth_pct >= 0.5: signals["breadth"] = "Positive"
+        elif breadth_pct >= 0.3: signals["breadth"] = "Narrow"
+        else:                     signals["breadth"] = "Broad Decline"
+
+    # Signal 4: NASDAQ vs SPY risk appetite
+    qqq = quotes.get("QQQ")
+    if qqq and spy:
+        diff = qqq.percent_change - spy.percent_change
+        score += min(10, max(-10, diff * 5))
+        if diff > 0.3:   signals["risk_appetite"] = "Risk-On"
+        elif diff < -0.3: signals["risk_appetite"] = "Risk-Off"
+        else:             signals["risk_appetite"] = "Neutral"
+
+    final_score = max(0, min(100, round(score)))
+    if final_score <= 25:   label = "Extreme Fear"
+    elif final_score <= 45: label = "Fear"
+    elif final_score <= 55: label = "Neutral"
+    elif final_score <= 75: label = "Greed"
+    else:                   label = "Extreme Greed"
+
+    return {
+        "score": final_score,
+        "label": label,
+        "signals": signals,
+        "inputs": {
+            "vxx_price":  vxx.current_price if vxx else None,
+            "spy_change": spy.percent_change if spy else None,
+            "breadth_pct": round(breadth_pct * 100, 1) if breadth_pct else None,
+        }
+    }
 
 # ── Agent Orchestration Endpoint ─────────────────────────────────
 
