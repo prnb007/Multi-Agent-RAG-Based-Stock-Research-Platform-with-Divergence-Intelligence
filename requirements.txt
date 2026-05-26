@@ -6,8 +6,8 @@ pydantic==2.7.1
 httpx
 
 # Data fetching
-pandas==2.2.2
-pandas-ta
+pandas==1.5.3
+pandas-ta==0.3.14b0
 numpy<2.0
 requests==2.31.0
 beautifulsoup4==4.12.3
