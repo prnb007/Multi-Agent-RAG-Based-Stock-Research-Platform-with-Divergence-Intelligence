@@ -7,7 +7,9 @@ Never calls any external API — pure computation only.
 
 import logging
 import pandas as pd
-import pandas_ta as ta
+from ta.momentum import RSIIndicator
+from ta.trend import MACD, EMAIndicator, SMAIndicator
+from ta.volatility import BollingerBands
 from dataclasses import dataclass
 from typing import Optional
 from providers.models import PriceHistory
@@ -67,12 +69,28 @@ class TechnicalIndicatorService:
         } for p in points])
 
         # Compute indicators
-        df.ta.rsi(length=14, append=True)
-        df.ta.macd(fast=12, slow=26, signal=9, append=True)
-        df.ta.bbands(length=20, std=2, append=True)
-        df.ta.ema(length=20, append=True)
-        df.ta.ema(length=50, append=True)
-        df.ta.sma(length=200, append=True)
+        # RSI
+        rsi_ind = RSIIndicator(close=df["close"], window=14)
+        df["RSI_14"] = rsi_ind.rsi()
+
+        # MACD
+        macd_ind = MACD(close=df["close"], window_fast=12, window_slow=26, window_sign=9)
+        df["MACD_12_26_9"]  = macd_ind.macd()
+        df["MACDs_12_26_9"] = macd_ind.macd_signal()
+        df["MACDh_12_26_9"] = macd_ind.macd_diff()
+
+        # Bollinger Bands
+        bb = BollingerBands(close=df["close"], window=20, window_dev=2)
+        df["BBU_20_2.0"] = bb.bollinger_hband()
+        df["BBM_20_2.0"] = bb.bollinger_mavg()
+        df["BBL_20_2.0"] = bb.bollinger_lband()
+
+        # EMAs
+        df["EMA_20"] = EMAIndicator(close=df["close"], window=20).ema_indicator()
+        df["EMA_50"] = EMAIndicator(close=df["close"], window=50).ema_indicator()
+
+        # SMA 200
+        df["SMA_200"] = SMAIndicator(close=df["close"], window=200).sma_indicator()
 
         last = df.iloc[-1]
         prev = df.iloc[-2] if len(df) > 1 else last

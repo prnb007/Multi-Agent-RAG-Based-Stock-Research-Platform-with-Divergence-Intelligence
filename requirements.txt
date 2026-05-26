@@ -6,9 +6,8 @@ pydantic==2.7.1
 httpx
 
 # Data fetching
-pandas==1.5.3
-git+https://github.com/twopirllc/pandas-ta.git@development
-numpy<2.0
+pandas>=2.0
+ta==0.11.0
 requests==2.31.0
 beautifulsoup4==4.12.3
 newsapi-python==0.2.7
