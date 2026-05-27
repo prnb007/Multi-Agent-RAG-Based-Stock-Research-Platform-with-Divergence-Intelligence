@@ -25,9 +25,9 @@ export function TopNavBar() {
   ];
 
   return (
-    <nav className="hidden md:flex fixed top-0 w-full z-50 justify-between items-center px-margin-desktop h-20 max-w-container-max mx-auto bg-surface/80 backdrop-blur-[12px] border-b border-white/5">
-      <div className="flex gap-4">
-        <div className="text-body-lg text-primary mr-12 tracking-[0.02em] font-headline-md italic">StockLens</div>
+    <nav className="flex fixed top-0 w-full z-50 justify-between items-center px-4 md:px-margin-desktop h-16 md:h-20 max-w-container-max mx-auto bg-surface/80 backdrop-blur-[12px] border-b border-white/5 overflow-x-auto no-scrollbar">
+      <div className="flex gap-2 md:gap-4 items-center whitespace-nowrap min-w-max">
+        <div className="text-body-lg text-primary mr-4 md:mr-12 tracking-[0.02em] font-headline-md italic">StockLens</div>
         {navItems.map((item) => {
           const isActive = pathname === item.path;
           return (

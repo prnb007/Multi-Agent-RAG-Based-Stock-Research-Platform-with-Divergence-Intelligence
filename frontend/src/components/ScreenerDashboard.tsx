@@ -40,21 +40,6 @@ export function ScreenerDashboard() {
           </section>
         </div>
 
-        <header className="mt-8 mb-6 flex justify-between items-end border-b border-glass-border-dim pb-4">
-          <div>
-            <h1 className="font-headline-md text-headline-md italic text-primary">Screener</h1>
-            <p className="text-on-surface-variant mt-2">142 Stocks Matched</p>
-          </div>
-          <div className="flex gap-4">
-            <button className="liquid-glass-strong px-6 py-2 rounded-full font-label-caps text-label-caps text-primary hover:opacity-80 transition-opacity flex items-center gap-2">
-              <span className="material-symbols-outlined text-[16px]">filter_list</span>
-              Filter
-            </button>
-            <button className="px-6 py-2 rounded-full border border-white/20 font-label-caps text-label-caps text-primary hover:bg-white/5 transition-all">
-              Export
-            </button>
-          </div>
-        </header>
 
         <ScreenerTable
           onAnalyze={(ticker) => {
