@@ -457,20 +457,30 @@ async def analyze_ticker(ticker: str):
             synthesis_result = await synthesis_agent.analyze(results)
             
             try:
-                report_data = {
-                    "divergence_score": synthesis_result.divergence_score,
-                    "highest_gap_pair": synthesis_result.highest_gap_pair,
-                    "bull_thesis": synthesis_result.bull_thesis,
-                    "bear_thesis": synthesis_result.bear_thesis,
-                    "overall_score": synthesis_result.overall_score,
-                }
-            except AttributeError:
+                if hasattr(synthesis_result, 'divergence_score'):
+                    report_data = {
+                        "divergence_score": synthesis_result.divergence_score,
+                        "highest_gap_pair": synthesis_result.highest_gap_pair,
+                        "bull_thesis":      synthesis_result.bull_thesis,
+                        "bear_thesis":      synthesis_result.bear_thesis,
+                        "overall_score":    synthesis_result.overall_score,
+                    }
+                else:
+                    # result came back as a dict (agent failure case)
+                    report_data = synthesis_result if isinstance(synthesis_result, dict) else {
+                        "divergence_score": 0.0,
+                        "highest_gap_pair": "Insufficient data",
+                        "bull_thesis":      "Analysis incomplete — some agents failed.",
+                        "bear_thesis":      "Try again or check API rate limits.",
+                        "overall_score":    0.0,
+                    }
+            except Exception as e:
                 report_data = {
                     "divergence_score": 0.0,
-                    "highest_gap_pair": "Analysis incomplete",
-                    "bull_thesis": "Insufficient agent data to generate thesis.",
-                    "bear_thesis": "One or more agents failed to complete analysis.",
-                    "overall_score": 0.0,
+                    "highest_gap_pair": "Error",
+                    "bull_thesis":      f"Synthesis error: {str(e)}",
+                    "bear_thesis":      f"Synthesis error: {str(e)}",
+                    "overall_score":    0.0,
                 }
 
             yield f"event: report_complete\ndata: {json.dumps(report_data)}\n\n"
