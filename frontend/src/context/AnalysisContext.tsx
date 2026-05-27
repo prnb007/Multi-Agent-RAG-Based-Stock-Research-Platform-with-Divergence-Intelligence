@@ -47,7 +47,8 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     setError(null);
     setProgress(10);
 
-    const eventSource = new EventSource(`http://localhost:8000/analyze/${targetTicker}`);
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const eventSource = new EventSource(`${apiBase}/analyze/${targetTicker}`);
 
     eventSource.addEventListener('agent_complete', (event) => {
       try {
