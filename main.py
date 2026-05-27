@@ -401,11 +401,26 @@ async def preprocess_narrative(ticker: str):
 
 @app.get("/recommendations/{ticker}")
 async def get_recommendations(ticker: str):
-    from providers.market_data_service import market_data_service
-    result = await market_data_service.get_recommendations(ticker.upper())
-    if not result:
-        return {"error": "No recommendations available"}
-    return result.model_dump()
+    try:
+        from providers.market_data_service import market_data_service
+        result = await market_data_service.get_recommendations(ticker.upper())
+        if not result:
+            return {"error": "No recommendations available"}
+        # Handle both Pydantic v1 and v2
+        try:
+            return result.model_dump()
+        except AttributeError:
+            return result.dict()
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {
+            "ticker": ticker.upper(),
+            "strong_buy": 0, "buy": 0, "hold": 0,
+            "sell": 0, "strong_sell": 0,
+            "total": 0, "consensus_score": 0.0,
+            "error": str(e)
+        }
 
 @app.get("/analyze/{ticker}")
 async def analyze_ticker(ticker: str):
