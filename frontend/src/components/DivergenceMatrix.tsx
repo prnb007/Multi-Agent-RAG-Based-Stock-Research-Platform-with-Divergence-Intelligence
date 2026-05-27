@@ -1,20 +1,45 @@
 "use client";
 
 import React, { useState } from 'react';
-
-// Mock data to match the HTML design
-const agents = ['Fund.', 'Sent.', 'Insid.', 'Tech.', 'Macro'];
-
-const matrixData = [
-  [null, 0.42, 0.15, 0.51, 0.22], // Fund.
-  [0.42, null, 0.85, 0.28, 0.45], // Sent.
-  [0.15, 0.85, null, 0.33, 0.19], // Insid.
-  [0.51, 0.28, 0.33, null, 0.72], // Tech.
-  [0.22, 0.45, 0.19, 0.72, null], // Macro
-];
+import { useAnalysis } from '@/hooks/useAnalysis';
 
 export function DivergenceMatrix() {
-  const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>({ row: 1, col: 2 }); // Default Sent. vs Insid. (0.85)
+  const { agents: agentsMap } = useAnalysis();
+  const agentList = Object.values(agentsMap);
+  const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
+
+  if (!agentList || agentList.length < 2) {
+    return (
+      <div className="text-center py-16 text-neutral-500">
+        Run an analysis to see the divergence matrix
+      </div>
+    );
+  }
+
+  const matrixData = agentList.map(a => 
+    agentList.map(b => 
+      a.agent === b.agent ? null : Math.abs(a.score - b.score)
+    )
+  );
+
+  let defaultRow = 0;
+  let defaultCol = 1;
+  let maxGap = -1;
+  for (let i = 0; i < agentList.length; i++) {
+    for (let j = i + 1; j < agentList.length; j++) {
+      const gap = Math.abs(agentList[i].score - agentList[j].score);
+      if (gap > maxGap) {
+        maxGap = gap;
+        defaultRow = i;
+        defaultCol = j;
+      }
+    }
+  }
+
+  const currentSelected = selectedCell || { row: defaultRow, col: defaultCol };
+  const agentA = agentList[currentSelected.row];
+  const agentB = agentList[currentSelected.col];
+  const currentGap = Math.abs(agentA.score - agentB.score);
 
   const getCellClass = (val: number | null, isSelected: boolean) => {
     if (val === null) return 'bg-white/5 border border-white/5 text-white/30 cursor-default';
@@ -49,21 +74,23 @@ export function DivergenceMatrix() {
           <div className="w-full overflow-x-auto">
             <div className="min-w-[600px]">
               {/* Header Row */}
-              <div className="grid grid-cols-6 gap-2 mb-2 font-label-caps text-label-caps text-on-surface-variant/50">
+              <div className="grid gap-2 mb-2 font-label-caps text-label-caps text-on-surface-variant/50"
+                   style={{ gridTemplateColumns: `100px repeat(${agentList.length}, minmax(0, 1fr))` }}>
                 <div className="flex items-center justify-end pr-4"></div>
-                {agents.map((agent) => (
-                  <div key={agent} className="text-center pb-2">{agent}</div>
+                {agentList.map((agent) => (
+                  <div key={agent.agent} className="text-center pb-2 capitalize truncate">{agent.agent}</div>
                 ))}
               </div>
               
               {/* Rows */}
-              {agents.map((agentRow, rowIndex) => (
-                <div key={agentRow} className="grid grid-cols-6 gap-2 mb-2">
-                  <div className="flex items-center justify-end pr-4 font-label-caps text-label-caps text-on-surface-variant/50">
-                    {agentRow}
+              {agentList.map((agentRow, rowIndex) => (
+                <div key={agentRow.agent} className="grid gap-2 mb-2"
+                     style={{ gridTemplateColumns: `100px repeat(${agentList.length}, minmax(0, 1fr))` }}>
+                  <div className="flex items-center justify-end pr-4 font-label-caps text-label-caps text-on-surface-variant/50 capitalize truncate">
+                    {agentRow.agent}
                   </div>
                   {matrixData[rowIndex].map((val, colIndex) => {
-                    const isSelected = selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
+                    const isSelected = currentSelected.row === rowIndex && currentSelected.col === colIndex;
                     return (
                       <div
                         key={`${rowIndex}-${colIndex}`}
@@ -84,31 +111,36 @@ export function DivergenceMatrix() {
       {/* Detail Panel */}
       <div className="lg:col-span-1 flex flex-col">
         <div className="bg-surface-overlay backdrop-blur-[50px] border border-glass-border-dim rounded-xl p-8 flex-1 shadow-2xl relative overflow-hidden liquid-glass">
-          {/* Subtle background accent for high divergence */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-full blur-[50px] -mr-16 -mt-16 pointer-events-none"></div>
+          {currentGap >= 0.6 && (
+            <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-full blur-[50px] -mr-16 -mt-16 pointer-events-none"></div>
+          )}
           
           <div className="flex items-center justify-between mb-8 relative z-10">
-            <div className="font-label-caps text-label-caps text-primary flex items-center gap-2">
-              <span className="material-symbols-outlined font-light text-[16px]">warning</span>
-              Critical Conflict Detected
+            <div className={`font-label-caps text-label-caps flex items-center gap-2 ${currentGap >= 0.6 ? 'text-primary' : 'text-on-surface-variant'}`}>
+              {currentGap >= 0.6 && <span className="material-symbols-outlined font-light text-[16px]">warning</span>}
+              {currentGap >= 0.6 ? 'Critical Conflict Detected' : 'Agent Divergence Analysis'}
             </div>
             <div className="px-3 py-1 rounded-full border border-white/20 text-[10px] font-label-caps uppercase text-white/50">
-              ID: DIV-94A
+              ID: DIV-{agentA.agent.substring(0, 2).toUpperCase()}{agentB.agent.substring(0, 2).toUpperCase()}
             </div>
           </div>
           
           <div className="mb-8 relative z-10">
-            <h2 className="font-headline-md text-[32px] text-primary mb-1">
-              {agents[selectedCell?.row ?? 1]} <span className="text-on-surface-variant italic font-light">vs.</span> {agents[selectedCell?.col ?? 2]}
+            <h2 className="font-headline-md text-[32px] text-primary mb-1 capitalize">
+              {agentA.agent} <span className="text-on-surface-variant italic font-light lowercase">vs.</span> {agentB.agent}
             </h2>
             <div className="flex items-center gap-4 mt-4">
               <div className="flex-1 bg-white/5 rounded-lg p-4 border border-white/5">
-                <div className="font-label-caps text-label-caps text-on-surface-variant mb-1">{agents[selectedCell?.row ?? 1]} Score</div>
-                <div className="font-body-lg text-body-lg text-green-400">+82 (Bullish)</div>
+                <div className="font-label-caps text-label-caps text-on-surface-variant mb-1 capitalize">{agentA.agent} Score</div>
+                <div className={`font-body-lg text-body-lg ${agentA.score >= 0.5 ? 'text-green-400' : 'text-red-400'}`}>
+                  {agentA.score.toFixed(2)} ({agentA.score >= 0.5 ? 'Bullish' : 'Bearish'})
+                </div>
               </div>
               <div className="flex-1 bg-white/5 rounded-lg p-4 border border-white/5">
-                <div className="font-label-caps text-label-caps text-on-surface-variant mb-1">{agents[selectedCell?.col ?? 2]} Score</div>
-                <div className="font-body-lg text-body-lg text-red-400">-45 (Bearish)</div>
+                <div className="font-label-caps text-label-caps text-on-surface-variant mb-1 capitalize">{agentB.agent} Score</div>
+                <div className={`font-body-lg text-body-lg ${agentB.score >= 0.5 ? 'text-green-400' : 'text-red-400'}`}>
+                  {agentB.score.toFixed(2)} ({agentB.score >= 0.5 ? 'Bullish' : 'Bearish'})
+                </div>
               </div>
             </div>
           </div>
@@ -116,21 +148,23 @@ export function DivergenceMatrix() {
           <div className="mb-8 relative z-10">
             <div className="font-label-caps text-label-caps text-on-surface-variant mb-3">Divergence Gap</div>
             <div className="flex items-end gap-3">
-              <span className="font-display-lg-mobile text-[48px] text-red-500 leading-none">
-                {matrixData[selectedCell?.row ?? 1][selectedCell?.col ?? 2]?.toFixed(2) ?? '0.85'}
+              <span className={`font-display-lg-mobile text-[48px] leading-none ${currentGap >= 0.6 ? 'text-red-500' : currentGap >= 0.3 ? 'text-amber-500' : 'text-green-500'}`}>
+                {currentGap.toFixed(2)}
               </span>
-              <span className="text-sm text-on-surface-variant pb-1">Extremely High</span>
+              <span className="text-sm text-on-surface-variant pb-1">
+                {currentGap >= 0.6 ? 'Extremely High' : currentGap >= 0.3 ? 'Moderate' : 'Low'}
+              </span>
             </div>
             
             {/* Mini visualization of the gap */}
             <div className="h-1 w-full bg-white/10 rounded-full mt-4 overflow-hidden relative">
               <div 
-                className="absolute left-0 top-0 h-full bg-gradient-to-r from-red-500/20 to-red-500/80" 
-                style={{ width: `${(matrixData[selectedCell?.row ?? 1][selectedCell?.col ?? 2] ?? 0) * 100}%` }}
+                className={`absolute left-0 top-0 h-full bg-gradient-to-r ${currentGap >= 0.6 ? 'from-red-500/20 to-red-500/80' : currentGap >= 0.3 ? 'from-amber-500/20 to-amber-500/80' : 'from-green-500/20 to-green-500/80'}`} 
+                style={{ width: `${Math.min(currentGap * 100, 100)}%` }}
               ></div>
               <div 
                 className="absolute top-1/2 w-2 h-2 bg-white rounded-full -translate-y-1/2 -translate-x-1/2 shadow-[0_0_10px_white]"
-                style={{ left: `${(matrixData[selectedCell?.row ?? 1][selectedCell?.col ?? 2] ?? 0) * 100}%` }}
+                style={{ left: `${Math.min(currentGap * 100, 100)}%` }}
               ></div>
             </div>
           </div>
@@ -138,10 +172,12 @@ export function DivergenceMatrix() {
           <div className="space-y-4 relative z-10">
             <div className="font-label-caps text-label-caps text-on-surface-variant">Intelligence Synthesis</div>
             <p className="font-body-md text-body-md text-on-surface leading-relaxed text-sm">
-              Sentiment agent is highly bullish based on social velocity, while Insider agent detects heavy selling from C-suite executives.
-            </p>
-            <p className="font-body-md text-body-md text-on-surface-variant leading-relaxed text-sm mt-2 opacity-70">
-              Historical correlation suggests insider selling preceding retail sentiment spikes often precedes a medium-term correction.
+              {agentA.agent === agentB.agent ? 'Same agent selected.' : 
+                ((agentA.score >= 0.5) === (agentB.score >= 0.5) ? 
+                  `Both agents are showing ${agentA.score >= 0.5 ? 'bullish' : 'bearish'} signals, suggesting alignment in their core analysis.` : 
+                  `${agentA.agent} is ${agentA.score >= 0.5 ? 'bullish' : 'bearish'} while ${agentB.agent} is ${agentB.score >= 0.5 ? 'bullish' : 'bearish'} — this suggests conflicting signals from these perspectives.`
+                )
+              }
             </p>
           </div>
           
