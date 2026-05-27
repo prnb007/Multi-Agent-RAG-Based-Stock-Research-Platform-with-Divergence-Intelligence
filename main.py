@@ -456,8 +456,24 @@ async def analyze_ticker(ticker: str):
             synthesis_agent = SynthesisAgent(ticker)
             synthesis_result = await synthesis_agent.analyze(results)
             
-            synthesis_data = synthesis_result.model_dump()
-            yield f"event: report_complete\ndata: {json.dumps(synthesis_data)}\n\n"
+            try:
+                report_data = {
+                    "divergence_score": synthesis_result.divergence_score,
+                    "highest_gap_pair": synthesis_result.highest_gap_pair,
+                    "bull_thesis": synthesis_result.bull_thesis,
+                    "bear_thesis": synthesis_result.bear_thesis,
+                    "overall_score": synthesis_result.overall_score,
+                }
+            except AttributeError:
+                report_data = {
+                    "divergence_score": 0.0,
+                    "highest_gap_pair": "Analysis incomplete",
+                    "bull_thesis": "Insufficient agent data to generate thesis.",
+                    "bear_thesis": "One or more agents failed to complete analysis.",
+                    "overall_score": 0.0,
+                }
+
+            yield f"event: report_complete\ndata: {json.dumps(report_data)}\n\n"
         except Exception as e:
             logger.error(f"Error in synthesis agent: {e}")
             yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
