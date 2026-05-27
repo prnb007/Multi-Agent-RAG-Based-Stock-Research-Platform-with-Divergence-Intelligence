@@ -155,18 +155,27 @@ class FinnhubProvider:
         logger.info(f"[Finnhub] Fetching realtime quote for {ticker}")
         q = await self._get("/quote", {"symbol": ticker})
 
-        if not q or "c" not in q or q["c"] == 0:
-            raise ValueError(f"Finnhub returned empty quote for {ticker}")
+        if not q or "c" not in q:
+            raise ValueError(f"Finnhub returned no data for {ticker}")
+
+        # After hours: c=0 but pc (previous close) has real value
+        current_price = q["c"] if q["c"] != 0 else q.get("pc", 0)
+        if current_price == 0:
+            raise ValueError(f"No price available for {ticker}")
+
+        # Use previous close as change reference when market closed
+        prev_close = q.get("pc", current_price)
+        percent_change = ((current_price - prev_close) / prev_close * 100) if prev_close != 0 else 0.0
 
         return RealtimeQuote(
             ticker=ticker.upper(),
-            current_price=float(q["c"]),
-            change=float(q.get("d", 0)),
-            percent_change=float(q.get("dp", 0)),
+            current_price=float(current_price),
+            change=float(current_price - prev_close) if q.get("d", 0) == 0 and q["c"] == 0 else float(q.get("d", 0)),
+            percent_change=float(percent_change) if q.get("dp", 0) == 0 and q["c"] == 0 else float(q.get("dp", 0)),
             day_high=float(q.get("h", 0)),
             day_low=float(q.get("l", 0)),
             day_open=float(q.get("o", 0)),
-            prev_close=float(q.get("pc", 0)),
+            prev_close=float(prev_close),
             timestamp=int(q.get("t", 0)),
             provider=self.name,
             fetched_at=datetime.utcnow()
