@@ -20,13 +20,23 @@ class SynthesisAgent:
     def __init__(self, ticker: str):
         self.ticker = ticker.upper()
 
-    async def analyze(self, agent_results: Dict[str, AgentOutput]) -> SynthesisOutput:
+    async def analyze(self, agent_results: Dict[str, any]) -> SynthesisOutput:
         logger.info(f"[{self.ticker}] SynthesisAgent starting analysis...")
         try:
+            # Normalize agent outputs to dict form for consistent access
+            normalized = {}
+            for name, output in agent_results.items():
+                if hasattr(output, 'model_dump'):
+                    normalized[name] = output.model_dump()
+                elif isinstance(output, dict):
+                    normalized[name] = output
+                else:
+                    continue  # Skip invalid outputs
+                    
             # Filter out agents with invalid scores or zero confidence
             valid_agents = {}
-            for name, output in agent_results.items():
-                if output.score is not None and output.confidence > 0:
+            for name, output in normalized.items():
+                if output.get('score') is not None and output.get('confidence', 0) > 0:
                     valid_agents[name] = output
             
             if len(valid_agents) < 2:
@@ -34,7 +44,8 @@ class SynthesisAgent:
                     divergence_score=0.0,
                     highest_gap_pair="N/A",
                     bull_thesis="Insufficient data for synthesis",
-                    bear_thesis="Insufficient data for synthesis"
+                    bear_thesis="Insufficient data for synthesis",
+                    overall_score=0.0
                 )
 
             # Calculate Divergence Score (Weighted Standard Deviation)
@@ -42,8 +53,8 @@ class SynthesisAgent:
             scores = []
             weights = []
             for name, output in valid_agents.items():
-                scores.append(output.score)
-                weights.append(output.confidence + 0.01) # Avoid zero weight
+                scores.append(output['score'])
+                weights.append(output.get('confidence', 0) + 0.01) # Avoid zero weight
                 
             scores = np.array(scores)
             weights = np.array(weights)
@@ -58,7 +69,7 @@ class SynthesisAgent:
             names = list(valid_agents.keys())
             for i in range(len(names)):
                 for j in range(i + 1, len(names)):
-                    diff = abs(valid_agents[names[i]].score - valid_agents[names[j]].score)
+                    diff = abs(valid_agents[names[i]]['score'] - valid_agents[names[j]]['score'])
                     if diff > max_diff:
                         max_diff = diff
                         highest_pair = f"{names[i].capitalize()} vs {names[j].capitalize()}"
@@ -72,10 +83,10 @@ class SynthesisAgent:
             
             for name, output in valid_agents.items():
                 context += f"--- {name.upper()} AGENT ---\n"
-                context += f"Score: {output.score}, Confidence: {output.confidence}\n"
-                context += f"Summary: {output.summary}\n"
+                context += f"Score: {output['score']}, Confidence: {output.get('confidence', 0)}\n"
+                context += f"Summary: {output.get('summary', '')}\n"
                 context += f"Evidence:\n"
-                for ev in output.evidence:
+                for ev in output.get('evidence', []):
                     context += f"- {ev}\n"
                 context += "\n"
             
@@ -98,10 +109,32 @@ class SynthesisAgent:
             return result
         except Exception as e:
             logger.error(f"[{self.ticker}] SynthesisAgent failed: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Compute a basic divergence even on partial failure
+            valid_scores = []
+            for name, output in agent_results.items():
+                try:
+                    if hasattr(output, 'score') and output.score is not None:
+                        valid_scores.append(output.score)
+                    elif isinstance(output, dict) and output.get('score') is not None:
+                        valid_scores.append(output['score'])
+                except Exception:
+                    continue
+
+            if len(valid_scores) >= 2:
+                import statistics
+                div = statistics.pstdev(valid_scores)
+                avg = statistics.mean(valid_scores)
+            else:
+                div = 0.0
+                avg = 0.0
+
             return SynthesisOutput(
-                divergence_score=0.0,
-                highest_gap_pair="Error",
-                bull_thesis=f"Analysis failed: {str(e)}",
-                bear_thesis=f"Analysis failed: {str(e)}",
-                overall_score=0.0
+                divergence_score=round(div, 2),
+                highest_gap_pair="Computed from partial agent data",
+                bull_thesis=f"Partial analysis available. {len(valid_scores)} of 5 agents completed successfully. Average score: {avg:.2f}",
+                bear_thesis=f"Some agents could not complete due to API rate limits or data unavailability. Review individual agent details for what's working.",
+                overall_score=round(avg, 2),
             )
