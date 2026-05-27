@@ -87,7 +87,7 @@ export function SearchDashboard() {
             <TabsContent value="overview" className="space-y-6 mt-6">
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
                 {synthesis ? (
-                  <SynthesisPanel synthesis={synthesis} agents={agents} />
+                  <SynthesisPanel synthesis={synthesis} agents={agents} ticker={ticker} />
                 ) : (
                   <div className="p-12 text-center border rounded-xl bg-card/30 border-dashed text-muted-foreground">
                     Synthesis report will appear here once all agents complete their analysis.
