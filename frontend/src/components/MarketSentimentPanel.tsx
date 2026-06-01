@@ -22,8 +22,8 @@ export default function MarketSentimentPanel() {
   const rotation = -135 + (score / 100) * 270;
 
   return (
-    <div className="rounded-2xl bg-neutral-900/40 border border-neutral-800/60 p-8">
-      <h3 className="font-serif italic text-2xl text-neutral-100 mb-6">
+    <div className="rounded-2xl bg-card border border-border p-8">
+      <h3 className="font-serif italic text-2xl text-foreground mb-6">
         Market Sentiment
       </h3>
 
@@ -50,13 +50,13 @@ export default function MarketSentimentPanel() {
           </svg>
           <div className="relative z-10 text-center mt-4">
             {loading ? (
-              <div className="h-10 w-16 bg-neutral-800 rounded animate-pulse mx-auto" />
+              <div className="h-10 w-16 bg-muted rounded animate-pulse mx-auto" />
             ) : (
               <>
                 <div className="text-4xl font-semibold" style={{ color }}>
                   {score}
                 </div>
-                <div className="text-xs tracking-widest text-neutral-400 mt-1">
+                <div className="text-xs tracking-widest text-muted-foreground mt-1">
                   {label.toUpperCase()}
                 </div>
               </>
@@ -78,10 +78,10 @@ export default function MarketSentimentPanel() {
             "Strong","Positive","Broad Advance","Low","Extremely Low","Risk-On"
           ].includes(value);
           return (
-            <div key={key} className="flex justify-between items-center py-2 border-b border-neutral-800/60">
-              <span className="text-sm text-neutral-400">{rowLabel}</span>
+            <div key={key} className="flex justify-between items-center py-2 border-b border-border">
+              <span className="text-sm text-muted-foreground">{rowLabel}</span>
               {loading ? (
-                <div className="h-4 w-16 bg-neutral-800 rounded animate-pulse" />
+                <div className="h-4 w-16 bg-muted rounded animate-pulse" />
               ) : (
                 <span className={`text-sm font-medium ${
                   isPositive ? "text-emerald-400" : "text-neutral-300"

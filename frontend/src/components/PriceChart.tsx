@@ -36,8 +36,7 @@ export function PriceChart({ ticker, priceHistory }: PriceChartProps) {
     return (
       <div className="w-full h-[400px] flex items-center justify-center border border-dashed border-border/50 rounded-xl bg-card/30">
         <p className="text-muted-foreground text-center px-6">
-          Price data unavailable — Yahoo Finance rate limit hit.<br />
-          Try again in a few minutes.
+          Price data unavailable — provider rate limit hit. Try again in a few minutes.
         </p>
       </div>
     );

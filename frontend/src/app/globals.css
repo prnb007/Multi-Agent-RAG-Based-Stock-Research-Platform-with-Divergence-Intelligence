@@ -53,6 +53,13 @@
   --color-surface-variant: #333535;
   --color-on-primary: #2f3131;
 
+  /* Semantic aliases used by shadcn-style components */
+  --color-card: #1e2020;
+  --color-foreground: #e2e2e2;
+  --color-muted: #282a2a;
+  --color-muted-foreground: #9a9d9e;
+  --color-border: #444748;
+
   --radius-DEFAULT: 1rem;
   --radius-lg: 2rem;
   --radius-xl: 3rem;
@@ -133,6 +140,13 @@
   --color-on-tertiary-fixed-variant: #004a78;
   --color-surface-tint: #4955b3;
   --color-background-void: #f8f9fa;
+
+  /* Semantic aliases — light mode overrides */
+  --color-card: #f3f4f5;
+  --color-foreground: #191c1d;
+  --color-muted: #e7e8e9;
+  --color-muted-foreground: #5a5c6a;
+  --color-border: #c6c5d4;
 
   /* Light mode glass effect */
   --color-glass-border-dim: rgba(0, 0, 0, 0.05);

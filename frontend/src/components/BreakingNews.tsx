@@ -10,7 +10,7 @@ interface Article {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  GENERAL:   "bg-neutral-700 text-neutral-200",
+  GENERAL:   "bg-muted text-foreground",
   FOREX:     "bg-blue-900/60 text-blue-300",
   CRYPTO:    "bg-orange-900/60 text-orange-300",
   MERGER:    "bg-purple-900/60 text-purple-300",
@@ -22,14 +22,14 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 function ArticleSkeleton() {
   return (
-    <div className="bg-neutral-900/60 border border-neutral-800/60 rounded-2xl p-6">
+    <div className="bg-card border border-border rounded-2xl p-6">
       <div className="flex justify-between mb-4">
-        <div className="h-5 w-16 bg-neutral-800 rounded animate-pulse" />
-        <div className="h-4 w-12 bg-neutral-800 rounded animate-pulse" />
+        <div className="h-5 w-16 bg-muted rounded animate-pulse" />
+        <div className="h-4 w-12 bg-muted rounded animate-pulse" />
       </div>
-      <div className="h-4 w-full bg-neutral-800 rounded animate-pulse mb-2" />
-      <div className="h-4 w-3/4 bg-neutral-800 rounded animate-pulse mb-6" />
-      <div className="h-3 w-20 bg-neutral-800 rounded animate-pulse" />
+      <div className="h-4 w-full bg-muted rounded animate-pulse mb-2" />
+      <div className="h-4 w-3/4 bg-muted rounded animate-pulse mb-6" />
+      <div className="h-3 w-20 bg-muted rounded animate-pulse" />
     </div>
   );
 }
@@ -56,7 +56,7 @@ export default function BreakingNews() {
 
   return (
     <div>
-      <h2 className="font-serif italic text-3xl text-neutral-100 mb-6">
+      <h2 className="font-serif italic text-3xl text-foreground mb-6">
         Breaking News
       </h2>
       <div className="grid grid-cols-2 gap-4">
@@ -71,20 +71,20 @@ export default function BreakingNews() {
                   href={a.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="bg-neutral-900/60 border border-neutral-800/60 rounded-2xl p-6 flex flex-col justify-between hover:bg-neutral-800/40 transition-colors cursor-pointer"
+                  className="bg-card border border-border rounded-2xl p-6 flex flex-col justify-between hover:bg-muted/60 transition-colors cursor-pointer"
                 >
                   <div>
                     <div className="flex items-center justify-between mb-4">
                       <span className={`text-xs px-2.5 py-1 rounded font-medium ${colorClass}`}>
                         {a.category}
                       </span>
-                      <span className="text-xs text-neutral-500">{a.ago}</span>
+                      <span className="text-xs text-muted-foreground">{a.ago}</span>
                     </div>
-                    <p className="text-neutral-100 font-medium leading-snug text-base">
+                    <p className="text-foreground font-medium leading-snug text-base">
                       {a.headline}
                     </p>
                   </div>
-                  <p className="text-xs text-neutral-500 mt-6">{a.source}</p>
+                  <p className="text-xs text-muted-foreground mt-6">{a.source}</p>
                 </a>
               );
             })}

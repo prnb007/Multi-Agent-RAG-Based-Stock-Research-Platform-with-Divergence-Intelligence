@@ -16,10 +16,10 @@ const SCREENER_TICKERS = [
 
 function SkeletonRow() {
   return (
-    <tr className="border-b border-neutral-800/60">
+    <tr className="border-b border-border/60">
       {[1,2,3,4,5,6].map(i => (
         <td key={i} className="px-4 py-4">
-          <div className="h-4 bg-neutral-800 rounded animate-pulse w-20" />
+          <div className="h-4 bg-muted rounded animate-pulse w-20" />
         </td>
       ))}
     </tr>
@@ -39,10 +39,10 @@ export default function ScreenerTable({
     <div className="w-full overflow-x-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-3xl font-light italic text-neutral-100">
+          <h2 className="text-3xl font-light italic text-foreground">
             Screener
           </h2>
-          <p className="text-sm text-neutral-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             {SCREENER_TICKERS.length} stocks · live prices
           </p>
         </div>
@@ -50,7 +50,7 @@ export default function ScreenerTable({
 
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-neutral-800 text-neutral-500 text-xs tracking-widest">
+          <tr className="border-b border-border text-muted-foreground text-xs tracking-widest">
             <th className="text-left px-4 py-3 font-normal">COMPANY</th>
             <th className="text-right px-4 py-3 font-normal">LAST PRICE</th>
             <th className="text-right px-4 py-3 font-normal">CHANGE</th>
@@ -76,13 +76,13 @@ export default function ScreenerTable({
                 return (
                   <tr
                     key={ticker}
-                    className="border-b border-neutral-800/40 hover:bg-neutral-900/40 transition-colors"
+                    className="border-b border-border/40 hover:bg-muted/30 transition-colors"
                   >
                     <td className="px-4 py-4">
-                      <div className="font-medium text-neutral-100">{ticker}</div>
-                      <div className="text-xs text-neutral-500 mt-0.5">{name}</div>
+                      <div className="font-medium text-foreground">{ticker}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{name}</div>
                     </td>
-                    <td className="px-4 py-4 text-right font-medium text-neutral-100">
+                    <td className="px-4 py-4 text-right font-medium text-foreground">
                       {q ? `$${q.current_price.toFixed(2)}` : "—"}
                     </td>
                     <td className={`px-4 py-4 text-right font-medium ${color}`}>
@@ -90,18 +90,18 @@ export default function ScreenerTable({
                         ? `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`
                         : "—"}
                     </td>
-                    <td className="px-4 py-4 text-right text-neutral-400">
+                    <td className="px-4 py-4 text-right text-muted-foreground">
                       {q
                         ? `$${q.day_low.toFixed(2)} – $${q.day_high.toFixed(2)}`
                         : "—"}
                     </td>
-                    <td className="px-4 py-4 text-right text-neutral-400">
+                    <td className="px-4 py-4 text-right text-muted-foreground">
                       {q ? `$${q.prev_close.toFixed(2)}` : "—"}
                     </td>
                     <td className="px-4 py-4 text-center">
                       <button
                         onClick={() => onAnalyze(ticker)}
-                        className="text-xs px-3 py-1.5 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100 transition-colors"
+                        className="text-xs px-3 py-1.5 rounded-lg border border-border text-foreground/80 hover:bg-muted hover:text-foreground transition-colors"
                       >
                         Analyze ↗
                       </button>

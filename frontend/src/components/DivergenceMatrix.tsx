@@ -181,12 +181,6 @@ export function DivergenceMatrix() {
             </p>
           </div>
           
-          <div className="mt-8 pt-6 border-t border-white/10 relative z-10">
-            <button className="w-full py-3 px-6 bg-white/5 hover:bg-white/10 border border-white/10 transition-colors rounded-lg flex items-center justify-center gap-2 font-label-caps text-label-caps text-primary">
-              <span>Analyze Conflict Depth</span>
-              <span className="material-symbols-outlined font-light text-[16px]">arrow_forward</span>
-            </button>
-          </div>
         </div>
       </div>
     </div>

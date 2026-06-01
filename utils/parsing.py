@@ -1,41 +1,88 @@
 import re
 import json
 import logging
-from typing import Any
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
-def parse_llm_json(raw: str, fallback: dict = None) -> dict:
+def parse_llm_json(raw: str, fallback: Optional[dict] = None) -> dict:
     """
-    Robust JSON extraction from LLM responses.
-    Handles: markdown fences, prefix/suffix text, single quotes, trailing commas.
+    Defensive JSON extraction from LLM responses.
+    Handles every weird format LLMs produce.
     """
     if not raw or not isinstance(raw, str):
         return fallback or {}
 
-    # Remove markdown code fences
-    raw = re.sub(r'```(?:json)?\s*', '', raw, flags=re.IGNORECASE)
-    raw = re.sub(r'```\s*$', '', raw)
+    # Step 1: Strip markdown fences
+    raw = re.sub(r'```(?:json|JSON)?\s*\n?', '', raw)
+    raw = re.sub(r'\n?```\s*$', '', raw)
+    raw = raw.strip()
 
-    # Find the JSON object (greedy match for nested braces)
-    match = re.search(r'\{[\s\S]*\}', raw)
-    if not match:
+    # Step 2: Try direct parse first (most efficient path)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+
+    # Step 3: Extract the outermost JSON object using balanced braces
+    json_str = _extract_json_object(raw)
+    if not json_str:
+        logger.warning(f"[parse_llm_json] No JSON object found in: {raw[:200]}")
         return fallback or {}
 
-    json_str = match.group(0)
-
+    # Step 4: Try parsing extracted JSON
     try:
         return json.loads(json_str)
     except json.JSONDecodeError:
         pass
 
-    # Fix common LLM mistakes
-    json_str = re.sub(r',\s*([}\]])', r'\1', json_str)  # trailing commas
-    json_str = json_str.replace("'", '"')                 # single to double quotes
+    # Step 5: Apply common fixes
+    cleaned = json_str
+    cleaned = re.sub(r',(\s*[}\]])', r'\1', cleaned)         # trailing commas
+    cleaned = re.sub(r"(?<!\\)'", '"', cleaned)              # single quotes (not escaped)
+    cleaned = re.sub(r'//[^\n]*', '', cleaned)               # // comments
+    cleaned = re.sub(r'/\*[\s\S]*?\*/', '', cleaned)         # /* */ comments
 
     try:
-        return json.loads(json_str)
+        return json.loads(cleaned)
     except json.JSONDecodeError as e:
-        logger.error(f"[parse_llm_json] Failed to parse: {json_str[:200]}... Error: {e}")
+        logger.error(
+            f"[parse_llm_json] All attempts failed. Raw: {raw[:300]}... Error: {e}"
+        )
         return fallback or {}
+
+
+def _extract_json_object(text: str) -> Optional[str]:
+    """Find first balanced JSON object in text."""
+    start = text.find('{')
+    if start == -1:
+        return None
+
+    depth = 0
+    in_string = False
+    escape = False
+
+    for i in range(start, len(text)):
+        char = text[i]
+
+        if escape:
+            escape = False
+            continue
+        if char == '\\':
+            escape = True
+            continue
+        if char == '"' and not escape:
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+
+        if char == '{':
+            depth += 1
+        elif char == '}':
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+
+    return None

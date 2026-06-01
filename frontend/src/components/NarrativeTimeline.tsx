@@ -173,7 +173,7 @@ export default function NarrativeTimeline({ ticker }: { ticker: string }) {
     return (
       <div className="space-y-4 animate-pulse">
         {[1,2,3].map(i => (
-          <div key={i} className="h-12 bg-neutral-800 rounded-xl" />
+          <div key={i} className="h-12 bg-muted rounded-xl" />
         ))}
       </div>
     );
@@ -183,10 +183,10 @@ export default function NarrativeTimeline({ ticker }: { ticker: string }) {
     return (
       <div className="text-center py-16">
         <div className="text-4xl mb-4">📄</div>
-        <h3 className="text-lg font-medium text-neutral-100 mb-2">
+        <h3 className="text-lg font-medium text-foreground mb-2">
           No narrative data yet for {ticker}
         </h3>
-        <p className="text-sm text-neutral-500 mb-6">
+        <p className="text-sm text-muted-foreground mb-6">
           Process SEC 10-Q filings to extract management language signals
         </p>
         <button
@@ -199,7 +199,7 @@ export default function NarrativeTimeline({ ticker }: { ticker: string }) {
             : "Extract Narrative Signals"}
         </button>
         {processing && (
-          <p className="text-xs text-neutral-500 mt-3">
+          <p className="text-xs text-muted-foreground mt-3">
             Downloading SEC filings and running LLM analysis...
           </p>
         )}
@@ -210,29 +210,34 @@ export default function NarrativeTimeline({ ticker }: { ticker: string }) {
   return (
     <div className="space-y-8">
 
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-2xl font-medium text-neutral-100">
-            Narrative Intelligence
-          </h2>
-          <p className="text-sm text-neutral-500 mt-1">
-            Management language signals across {data.quarters.length} quarters
-            of SEC 10-Q filings
-          </p>
-        </div>
+      {/* Introduction block */}
+      <div className="mb-8">
+        <h2 className="text-2xl font-medium text-foreground mb-3">
+          Narrative Intelligence for {ticker?.toUpperCase() || "—"}
+        </h2>
+        <p className="text-sm text-muted-foreground leading-relaxed max-w-3xl">
+          Tracks how management language shifts across the last {data.quarters.length} quarterly SEC 10-Q filings.
+          By analyzing the Management Discussion &amp; Analysis (MD&amp;A) section of each filing,
+          we extract standardized signals — tone, margin language, AI monetization, demand,
+          hiring, and regulatory concerns — to surface narrative shifts that often precede
+          fundamental changes. Click any quarter column to see specific quotes and concerns.
+        </p>
+      </div>
+
+      {/* Header controls */}
+      <div className="flex items-center justify-end">
         <button
           onClick={triggerProcess}
           disabled={processing}
-          className="text-xs px-3 py-1.5 rounded-lg border border-neutral-700 text-neutral-400 hover:text-neutral-200 hover:border-neutral-500 disabled:opacity-40 transition-colors"
+          className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-foreground/50 disabled:opacity-40 transition-colors"
         >
           {processing ? "Refreshing..." : "↻ Refresh"}
         </button>
       </div>
 
       {/* Signal trend grid */}
-      <div className="bg-neutral-900/40 border border-neutral-800/60 rounded-2xl p-6">
-        <div className="text-xs text-neutral-500 tracking-widest mb-6">
+      <div className="bg-card border border-border rounded-2xl p-6">
+        <div className="text-xs text-muted-foreground tracking-widest mb-6">
           SIGNAL TRENDS ACROSS QUARTERS
         </div>
 
@@ -261,10 +266,10 @@ export default function NarrativeTimeline({ ticker }: { ticker: string }) {
         {SIGNALS.map(({ key, label }) => (
           <div
             key={key}
-            className="grid items-center py-3 border-b border-neutral-800/40"
+            className="grid items-center py-3 border-b border-border/40"
             style={{ gridTemplateColumns: `160px repeat(${data.quarters.length}, 1fr)` }}
           >
-            <span className="text-xs text-neutral-400">{label}</span>
+            <span className="text-xs text-muted-foreground">{label}</span>
             {data.quarters.map(q => (
               <div key={q.quarter} className="flex justify-center">
                 <SignalDot value={(q as any)[key]} />
@@ -276,13 +281,13 @@ export default function NarrativeTimeline({ ticker }: { ticker: string }) {
 
       {/* Selected quarter detail */}
       {selected && (
-        <div className="bg-neutral-900/40 border border-neutral-800/60 rounded-2xl p-6">
+        <div className="bg-card border border-border rounded-2xl p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 className="text-sm font-medium text-neutral-100">
+              <h3 className="text-sm font-medium text-foreground">
                 {selected.quarter} · Detailed Analysis
               </h3>
-              <p className="text-xs text-neutral-500 mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 Filed {selected.filing_date} ·
                 {Math.round(selected.confidence * 100)}% confidence
               </p>
@@ -292,14 +297,14 @@ export default function NarrativeTimeline({ ticker }: { ticker: string }) {
           {/* Key quotes */}
           {selected.key_quotes.length > 0 && (
             <div className="mb-5">
-              <div className="text-xs text-neutral-500 tracking-widest mb-3">
+              <div className="text-xs text-muted-foreground tracking-widest mb-3">
                 KEY MANAGEMENT LANGUAGE
               </div>
               <div className="space-y-2">
                 {selected.key_quotes.map((q, i) => (
                   <div
                     key={i}
-                    className="text-sm text-neutral-300 italic border-l-2 border-violet-500/50 pl-3 py-1"
+                    className="text-sm text-foreground/80 italic border-l-2 border-violet-500/50 pl-3 py-1"
                   >
                     "{q}"
                   </div>
@@ -311,14 +316,14 @@ export default function NarrativeTimeline({ ticker }: { ticker: string }) {
           {/* Recurring concerns */}
           {selected.recurring_concerns.length > 0 && (
             <div>
-              <div className="text-xs text-neutral-500 tracking-widest mb-3">
+              <div className="text-xs text-muted-foreground tracking-widest mb-3">
                 RECURRING CONCERNS
               </div>
               <div className="flex flex-wrap gap-2">
                 {selected.recurring_concerns.map((c, i) => (
                   <span
                     key={i}
-                    className="text-xs px-3 py-1.5 rounded-full bg-neutral-800 text-neutral-400 border border-neutral-700/60"
+                    className="text-xs px-3 py-1.5 rounded-full bg-muted text-muted-foreground border border-border"
                   >
                     {c}
                   </span>

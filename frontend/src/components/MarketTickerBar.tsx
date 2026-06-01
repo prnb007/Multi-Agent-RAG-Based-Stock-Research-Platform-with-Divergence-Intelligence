@@ -28,24 +28,24 @@ function TickerTile({ ticker, label, quote, loading }: {
 }) {
   if (loading) {
     return (
-      <div className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 px-5 py-4">
-        <div className="text-[10px] tracking-widest text-neutral-500 mb-2">
+      <div className="rounded-2xl bg-card border border-border px-5 py-4">
+        <div className="text-[10px] tracking-widest text-muted-foreground mb-2">
           {label}
         </div>
-        <div className="h-6 w-24 bg-neutral-800 animate-pulse rounded" />
+        <div className="h-6 w-24 bg-muted animate-pulse rounded" />
       </div>
     );
   }
 
   if (!quote) {
     return (
-      <div className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 px-5 py-4">
-        <div className="text-[10px] tracking-widest text-neutral-500 mb-2">
+      <div className="rounded-2xl bg-card border border-border px-5 py-4">
+        <div className="text-[10px] tracking-widest text-muted-foreground mb-2">
           {label}
         </div>
         <div className="flex items-baseline gap-3">
-          <div className="text-2xl font-semibold text-neutral-100">—</div>
-          <div className="text-xs text-neutral-500">data unavailable</div>
+          <div className="text-2xl font-semibold text-foreground">—</div>
+          <div className="text-xs text-muted-foreground">data unavailable</div>
         </div>
       </div>
     );
@@ -58,12 +58,12 @@ function TickerTile({ ticker, label, quote, loading }: {
   const Icon = isUp ? ArrowUp : isDown ? ArrowDown : Minus;
 
   return (
-    <div className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 px-5 py-4">
-      <div className="text-[10px] tracking-widest text-neutral-500 mb-2">
+    <div className="rounded-2xl bg-card border border-border px-5 py-4">
+      <div className="text-[10px] tracking-widest text-muted-foreground mb-2">
         {label}
       </div>
       <div className="flex items-baseline justify-between gap-3">
-        <div className="text-2xl font-semibold text-neutral-100">
+        <div className="text-2xl font-semibold text-foreground">
           {formatPrice(quote.current_price, ticker)}
         </div>
         <div className={`flex items-center gap-1 text-sm ${color}`}>
