@@ -5,6 +5,8 @@ from datetime import datetime
 from typing import Optional
 from dataclasses import dataclass, field
 
+COOLDOWN_SECONDS = 120  # Allow retry after 2 min since last failure
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -72,7 +74,25 @@ class ProviderHealthMonitor:
         )
 
     def is_provider_healthy(self, provider: str) -> bool:
-        return self._stats[provider].is_healthy
+        stats = self._stats[provider]
+        # Time-based recovery: if cooldown has elapsed since last failure, allow retry
+        if not stats.is_healthy and stats.last_failure_at:
+            elapsed = (datetime.utcnow() - stats.last_failure_at).total_seconds()
+            if elapsed > COOLDOWN_SECONDS:
+                logger.info(
+                    f"[Health] {provider} cooldown elapsed ({elapsed:.0f}s) — resetting for retry"
+                )
+                stats.consecutive_failures = 0
+        return stats.is_healthy
+
+    def reset(self, provider: Optional[str] = None) -> None:
+        """Manually reset health stats for a provider or all providers."""
+        if provider:
+            self._stats[provider] = ProviderStats()
+            logger.info(f"[Health] Manually reset stats for {provider}")
+        else:
+            self._stats.clear()
+            logger.info("[Health] Manually reset all provider stats")
 
     def get_healthiest_provider(self, providers: list[str]) -> str:
         """Return the provider with best health score from the list."""

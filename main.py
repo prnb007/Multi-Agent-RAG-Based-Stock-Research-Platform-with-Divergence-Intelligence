@@ -70,6 +70,13 @@ def provider_health():
         "timestamp": datetime.utcnow().isoformat()
     }
 
+@app.post("/health/reset")
+def reset_provider_health(provider: str = None):
+    """Reset health monitor state for a provider (or all) to unblock stuck providers."""
+    from providers.health_monitor import health_monitor
+    health_monitor.reset(provider)
+    return {"status": "reset", "provider": provider or "all", "timestamp": datetime.utcnow().isoformat()}
+
 @app.get("/test/provider/{ticker}")
 async def test_provider(ticker: str):
     from providers.market_data_service import market_data_service

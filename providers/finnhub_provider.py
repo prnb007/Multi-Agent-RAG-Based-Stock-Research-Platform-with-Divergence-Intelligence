@@ -155,26 +155,36 @@ class FinnhubProvider:
         logger.info(f"[Finnhub] Fetching realtime quote for {ticker}")
         q = await self._get("/quote", {"symbol": ticker})
 
+        logger.info(f"[Finnhub] Raw quote for {ticker}: {q}")
+
         if not q or "c" not in q:
             raise ValueError(f"Finnhub returned no data for {ticker}")
 
-        # After hours: c=0 but pc (previous close) has real value
-        current_price = q["c"] if q["c"] != 0 else q.get("pc", 0)
-        if current_price == 0:
-            raise ValueError(f"No price available for {ticker}")
+        current = q.get("c", 0)
+        prev_close = q.get("pc", 0)
 
-        # Use previous close as change reference when market closed
-        prev_close = q.get("pc", current_price)
-        percent_change = ((current_price - prev_close) / prev_close * 100) if prev_close != 0 else 0.0
+        # Fallback chain: live price → previous close → high/low midpoint
+        price = current if current > 0 else prev_close
+        if price == 0:
+            high = q.get("h", 0)
+            low = q.get("l", 0)
+            if high > 0 and low > 0:
+                price = (high + low) / 2
+
+        if price == 0:
+            raise ValueError(f"Finnhub returned all-zero quote for {ticker}: {q}")
+
+        pct_change = ((price - prev_close) / prev_close * 100) if prev_close > 0 else 0.0
+        abs_change = price - prev_close
 
         return RealtimeQuote(
             ticker=ticker.upper(),
-            current_price=float(current_price),
-            change=float(current_price - prev_close) if q.get("d", 0) == 0 and q["c"] == 0 else float(q.get("d", 0)),
-            percent_change=float(percent_change) if q.get("dp", 0) == 0 and q["c"] == 0 else float(q.get("dp", 0)),
-            day_high=float(q.get("h", 0)),
-            day_low=float(q.get("l", 0)),
-            day_open=float(q.get("o", 0)),
+            current_price=float(price),
+            change=float(abs_change),
+            percent_change=float(pct_change),
+            day_high=float(q.get("h", price)),
+            day_low=float(q.get("l", price)),
+            day_open=float(q.get("o", price)),
             prev_close=float(prev_close),
             timestamp=int(q.get("t", 0)),
             provider=self.name,
