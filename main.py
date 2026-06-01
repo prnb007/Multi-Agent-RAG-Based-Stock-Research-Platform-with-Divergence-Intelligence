@@ -11,7 +11,7 @@ import json
 import asyncio
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -77,121 +77,6 @@ def reset_provider_health(provider: str = None):
     health_monitor.reset(provider)
     return {"status": "reset", "provider": provider or "all", "timestamp": datetime.utcnow().isoformat()}
 
-@app.get("/test/provider/{ticker}")
-async def test_provider(ticker: str):
-    from providers.market_data_service import market_data_service
-    from providers.health_monitor import health_monitor
-    from providers.cache_service import cache_service
-
-    overview = await market_data_service.get_company_overview(ticker.upper())
-    price    = await market_data_service.get_price_history(ticker.upper())
-
-    return {
-        "company": overview.model_dump(),
-        "price_points": len(price.points),
-        "latest_close": price.points[0].close if price.points else None,
-        "provider_used": overview.provider,
-        "provider_health": health_monitor.get_all_stats(),
-        "cache_stats": cache_service.stats(),
-    }
-
-@app.get("/test/analytics/{ticker}")
-async def test_analytics(ticker: str):
-    from providers.market_data_service import market_data_service
-    from analytics.technical_indicator_service import technical_indicator_service
-    from analytics.financial_analysis_service import financial_analysis_service
-    from analytics.news_aggregation_service import news_aggregation_service
-    from analytics.sector_comparison_service import sector_comparison_service
-    import dataclasses
-
-    ticker = ticker.upper()
-
-    overview  = await market_data_service.get_company_overview(ticker)
-    prices    = await market_data_service.get_price_history(ticker)
-    income    = await market_data_service.get_income_statement(ticker)
-    balance   = await market_data_service.get_balance_sheet(ticker)
-    cashflow  = await market_data_service.get_cash_flow(ticker)
-
-    technical = technical_indicator_service.compute(prices)
-    financial = financial_analysis_service.compute(
-        overview, income, balance, cashflow
-    )
-    news      = await news_aggregation_service.get_company_news(
-        ticker, overview.name
-    )
-    sentiment = news_aggregation_service.compute_sentiment_summary(news)
-    sector    = await sector_comparison_service.compare(
-        ticker, overview.sector
-    )
-
-    return {
-        "technical": dataclasses.asdict(technical),
-        "financial": dataclasses.asdict(financial),
-        "news_count": len(news),
-        "sentiment": sentiment,
-        "sector": dataclasses.asdict(sector),
-    }
-
-@app.get("/test/finnhub/{ticker}")
-async def test_finnhub(ticker: str):
-    from providers.finnhub_provider import FinnhubProvider
-
-    provider = FinnhubProvider()
-    ticker = ticker.upper()
-
-    try:
-        overview     = await provider.get_company_overview(ticker)
-        quote        = await provider.get_realtime_quote(ticker)
-        try:
-            prices = await provider.get_price_history(ticker)
-        except Exception as e:
-            prices = None
-            print(f"Candles failed (expected on free tier): {e}")
-        news         = await provider.get_news(ticker, limit=10)
-        insider      = await provider.get_insider_trades(ticker, limit=10)
-        peers        = await provider.get_peers(ticker)
-        recs         = await provider.get_recommendations(ticker)
-        sentiment    = await provider.get_sentiment_summary(ticker)
-    finally:
-        await provider.close()
-
-    return {
-        "overview":    overview.model_dump(),
-        "realtime":    quote.model_dump(),
-        "price_points": len(prices.points) if prices else 0,
-        "latest_close": prices.points[0].close if (prices and prices.points) else None,
-        "news_count":  len(news),
-        "first_headline": news[0].title if news else None,
-        "insider_count": len(insider),
-        "first_insider":  insider[0].model_dump() if insider else None,
-        "peers":          peers,
-        "recommendations": recs.model_dump() if recs else None,
-        "sentiment":       sentiment.model_dump() if sentiment else None,
-    }
-
-
-@app.get("/test/fmp/{ticker}")
-async def test_fmp(ticker: str):
-    from providers.fmp_provider import FMPProvider
-
-    provider = FMPProvider()
-    ticker = ticker.upper()
-
-    try:
-        overview = await provider.get_company_overview(ticker)
-        income   = await provider.get_income_statement(ticker)
-        balance  = await provider.get_balance_sheet(ticker)
-        cashflow = await provider.get_cash_flow(ticker)
-    finally:
-        await provider.close()
-
-    return {
-        "overview":   overview.model_dump(),
-        "income":     income.model_dump()   if income   else None,
-        "balance":    balance.model_dump()  if balance  else None,
-        "cashflow":   cashflow.model_dump() if cashflow else None,
-    }
-
 
 @app.get("/quotes/batch")
 async def get_batch_quotes(tickers: str):
@@ -200,7 +85,6 @@ async def get_batch_quotes(tickers: str):
     Usage: /quotes/batch?tickers=AAPL,MSFT,GOOGL,TSLA,NVDA
     """
     from providers.market_data_service import market_data_service
-    import asyncio
 
     symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()][:20]
     results = await asyncio.gather(*[
@@ -226,7 +110,6 @@ async def get_market_news(limit: int = 8):
     Not ticker-specific — broad market headlines.
     """
     from providers.finnhub_provider import FinnhubProvider
-    import asyncio
 
     provider = FinnhubProvider()
     try:
@@ -264,8 +147,6 @@ async def get_market_news(limit: int = 8):
 
 @app.get("/market/sentiment")
 async def get_market_sentiment():
-    import asyncio, httpx, time as _time
-
     ALL_TICKERS = ["SPY", "QQQ", "VXX", "AAPL", "MSFT", "NVDA",
                    "GOOGL", "AMZN", "META", "TSLA", "JPM", "V", "JNJ"]
     BREADTH_TICKERS = ["AAPL","MSFT","NVDA","GOOGL","AMZN",
@@ -393,7 +274,6 @@ async def preprocess_narrative(ticker: str):
     so the timeline loads instantly.
     """
     from narrative.narrative_service import narrative_service
-    import asyncio
 
     async def background_process():
         await narrative_service.get_narrative_timeline(
@@ -419,8 +299,7 @@ async def get_recommendations(ticker: str):
         except AttributeError:
             return result.dict()
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Recommendations error for {ticker}: {e}", exc_info=True)
         return {
             "ticker": ticker.upper(),
             "strong_buy": 0, "buy": 0, "hold": 0,

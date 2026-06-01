@@ -21,7 +21,7 @@ class CompanyOverview(BaseModel):
     fifty_two_week_low: Optional[float]
     dividend_yield: Optional[float]
     beta: Optional[float]
-    provider: str    # which provider returned this: "alpha_vantage" | "yfinance"
+    provider: str    # which provider returned this: "alpha_vantage" | "finnhub" | "fmp"
     fetched_at: datetime
 
 class PricePoint(BaseModel):

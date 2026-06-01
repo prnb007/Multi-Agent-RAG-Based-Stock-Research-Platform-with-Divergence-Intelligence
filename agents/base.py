@@ -3,10 +3,11 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 import logging
 import os
-import json
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from dotenv import load_dotenv
+
+from utils.parsing import parse_llm_json
 
 load_dotenv()
 
@@ -17,6 +18,13 @@ _llm = ChatGroq(
     api_key=os.getenv("GROQ_API_KEY"),
     temperature=0.1,
 )
+
+_AGENT_FALLBACK = {
+    "score": 0.0,
+    "confidence": 0.0,
+    "summary": "Failed to parse LLM response",
+    "evidence": [],
+}
 
 async def call_llm(system_prompt: str, user_prompt: str) -> dict:
     """
@@ -29,20 +37,7 @@ async def call_llm(system_prompt: str, user_prompt: str) -> dict:
     ])
     chain = prompt | _llm
     response = await chain.ainvoke({})
-    raw = response.content
-
-    # Strip markdown code fences if present
-    cleaned = raw.replace("```json", "").replace("```", "").strip()
-    try:
-        return json.loads(cleaned)
-    except json.JSONDecodeError:
-        logger.error(f"LLM returned non-JSON: {raw[:200]}")
-        return {
-            "score": 0.0,
-            "confidence": 0.0,
-            "summary": "Failed to parse LLM response",
-            "evidence": []
-        }
+    return parse_llm_json(response.content, fallback=_AGENT_FALLBACK)
 
 class AgentOutput(BaseModel):
     agent: Optional[str] = Field(default=None, description="Name of the agent that produced this output")

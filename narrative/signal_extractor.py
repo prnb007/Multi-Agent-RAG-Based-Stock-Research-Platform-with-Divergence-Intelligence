@@ -3,10 +3,10 @@ Uses Groq LLM to extract 7 standardized signals from MD&A text.
 One LLM call per quarter per ticker.
 """
 
-import json
 import logging
 import os
 from langchain_groq import ChatGroq
+from utils.parsing import parse_llm_json
 
 logger = logging.getLogger(__name__)
 
@@ -74,10 +74,7 @@ Extract the 7 signals and return JSON only."""
             SystemMessage(content=SYSTEM_PROMPT),
             HumanMessage(content=user_prompt),
         ])
-        raw = response.content.strip()
-        # Strip markdown fences if present
-        raw = raw.replace("```json", "").replace("```", "").strip()
-        signals = json.loads(raw)
+        signals = parse_llm_json(response.content, fallback=_default_signals())
         logger.info(
             f"[Extractor] {ticker} {quarter}: "
             f"tone={signals.get('management_tone')} "

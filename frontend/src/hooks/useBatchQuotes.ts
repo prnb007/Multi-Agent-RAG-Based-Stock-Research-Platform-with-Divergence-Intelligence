@@ -38,12 +38,6 @@ export function useBatchQuotes(
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: BatchQuoteResponse = await res.json();
-        console.log('[BatchQuotes] received', {
-          url,
-          quotes_count: data.quotes?.length,
-          failed: data.failed,
-          first_quote: data.quotes?.[0]
-        });
         if (cancelled) return;
 
         const map: Record<string, RealtimeQuote> = {};

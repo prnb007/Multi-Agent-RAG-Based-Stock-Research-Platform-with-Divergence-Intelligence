@@ -52,7 +52,6 @@ class AlphaVantageProvider:
     @aggressive_retry
     async def get_company_overview(self, ticker: str) -> CompanyOverview:
         logger.info(f"[AV] Fetching overview for {ticker}")
-        start = __import__("time").time()
         data = await self._get({"function": "OVERVIEW", "symbol": ticker})
 
         if not data or "Symbol" not in data:

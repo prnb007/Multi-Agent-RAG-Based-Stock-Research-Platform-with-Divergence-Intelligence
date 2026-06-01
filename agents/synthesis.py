@@ -1,11 +1,9 @@
 import logging
 import numpy as np
-from typing import Dict, List
+from typing import Dict
 from pydantic import BaseModel, Field
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
-
-from agents.base import AgentOutput
 
 logger = logging.getLogger(__name__)
 
