@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { SynthesisData, AgentData } from '@/hooks/useAnalysis';
 import AnalystPanel from '@/components/AnalystPanel';
+import { InfoTooltip } from '@/components/InfoTooltip';
 
 interface SynthesisPanelProps {
   synthesis: SynthesisData;
@@ -51,17 +52,25 @@ export function SynthesisPanel({ synthesis, agents, ticker }: SynthesisPanelProp
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Divergence Score</p>
+              <p className="text-sm font-medium text-muted-foreground flex items-center">
+                Divergence Score <InfoTooltip termKey="divergence_score" />
+              </p>
               <h3 className="text-3xl font-bold">{displayScore.toFixed(2)}</h3>
             </div>
             <div className={`flex items-center gap-2 ${status.color}`}>
               <span className="material-symbols-outlined text-[24px]">{status.icon}</span>
-              <span className="font-semibold">{status.label}</span>
+              <span className="font-semibold flex items-center">
+                {status.label}
+                {status.label === 'Consensus' && <InfoTooltip termKey="consensus" />}
+                {status.label === 'High Conflict' && <InfoTooltip termKey="high_conflict" />}
+              </span>
             </div>
           </div>
           
           <div>
-            <h4 className="text-sm font-semibold text-muted-foreground mb-2">Highest Gap Pair</h4>
+            <h4 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center">
+              Highest Gap Pair <InfoTooltip termKey="highest_gap_pair" />
+            </h4>
             <div className="p-3 bg-secondary rounded text-sm font-medium">
               {synthesis.highest_gap_pair}
             </div>
@@ -74,13 +83,14 @@ export function SynthesisPanel({ synthesis, agents, ticker }: SynthesisPanelProp
       <Card className="bg-card/50 backdrop-blur-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            Synthesis Thesis
+            Synthesis Thesis <InfoTooltip termKey="synthesis_thesis" size="md" />
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
             <h4 className="flex items-center gap-2 text-green-500 font-semibold mb-2">
-              <span className="material-symbols-outlined text-[16px]">trending_up</span> Bull Thesis
+              <span className="material-symbols-outlined text-[16px]">trending_up</span>
+              Bull Thesis <InfoTooltip termKey="bull_thesis" />
             </h4>
             <p className="text-sm text-muted-foreground leading-relaxed">
               {synthesis.bull_thesis}
@@ -89,7 +99,8 @@ export function SynthesisPanel({ synthesis, agents, ticker }: SynthesisPanelProp
           <div className="h-px bg-border w-full" />
           <div>
             <h4 className="flex items-center gap-2 text-red-500 font-semibold mb-2">
-              <span className="material-symbols-outlined text-[16px]">trending_down</span> Bear Thesis
+              <span className="material-symbols-outlined text-[16px]">trending_down</span>
+              Bear Thesis <InfoTooltip termKey="bear_thesis" />
             </h4>
             <p className="text-sm text-muted-foreground leading-relaxed">
               {synthesis.bear_thesis}

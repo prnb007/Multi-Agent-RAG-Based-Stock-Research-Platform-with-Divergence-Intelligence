@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { InfoTooltip } from "@/components/InfoTooltip";
 
 interface Recommendation {
   ticker:          string;
@@ -94,8 +95,8 @@ export default function AnalystPanel({ ticker }: { ticker: string }) {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-sm font-medium text-neutral-100 tracking-wide">
-            Wall Street Consensus
+          <h3 className="text-sm font-medium text-neutral-100 tracking-wide flex items-center">
+            Wall Street Consensus <InfoTooltip termKey="wall_street_consensus" />
           </h3>
           <p className="text-xs text-neutral-500 mt-0.5">
             {data.total} analysts · {data.period}

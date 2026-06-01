@@ -4,6 +4,7 @@ import { Badge } from './ui/badge';
 import { AgentData } from '@/hooks/useAnalysis';
 import { motion } from 'framer-motion';
 import { PriceChart } from './PriceChart';
+import { InfoTooltip, EvidenceWithTooltips } from './InfoTooltip';
 
 interface AgentCardProps {
   name: string;
@@ -40,6 +41,7 @@ export function AgentCard({ name, ticker, data, isLoading }: AgentCardProps) {
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-lg font-medium capitalize flex items-center gap-2">
           {name}
+          <InfoTooltip termKey={`${name.toLowerCase()}_agent`} />
           {!data && isLoading && <span className="material-symbols-outlined text-[16px] animate-spin text-muted-foreground">sync</span>}
           {data && <span className="material-symbols-outlined text-[16px] text-green-500">check_circle</span>}
         </CardTitle>
@@ -64,7 +66,9 @@ export function AgentCard({ name, ticker, data, isLoading }: AgentCardProps) {
           <div className="space-y-4 agent-card-enter">
             <div>
               <div className="text-sm text-muted-foreground mb-1 flex justify-between">
-                <span>Confidence</span>
+                <span className="flex items-center">
+                  Confidence <InfoTooltip termKey="confidence" />
+                </span>
                 <span>{(data.confidence * 100).toFixed(0)}%</span>
               </div>
               <div className="w-full bg-secondary rounded-full h-1.5">
@@ -88,7 +92,9 @@ export function AgentCard({ name, ticker, data, isLoading }: AgentCardProps) {
                 {data.evidence.map((ev, i) => (
                   <li key={i} className="text-sm flex items-start gap-2">
                     <span className="text-primary mt-1">•</span>
-                    <span className="text-muted-foreground">{ev}</span>
+                    <span className="text-muted-foreground">
+                      <EvidenceWithTooltips text={ev} />
+                    </span>
                   </li>
                 ))}
               </ul>

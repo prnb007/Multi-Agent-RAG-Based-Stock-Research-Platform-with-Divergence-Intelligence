@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Card, CardContent } from './ui/card';
+import { InfoTooltip } from './InfoTooltip';
 
 export interface AgentResult {
   agent: string;
@@ -83,16 +84,22 @@ export function DivergencePanel({ agents, divergenceScore, highestGapPair }: Div
       {/* Top Summary Bar */}
       <div className="flex items-center justify-between p-6 bg-card/50 backdrop-blur-sm border rounded-xl shadow-sm">
         <div>
-          <p className="text-sm font-medium text-muted-foreground mb-1">Overall Divergence Score</p>
+          <p className="text-sm font-medium text-muted-foreground mb-1 flex items-center">
+            Overall Divergence Score <InfoTooltip termKey="divergence_score" />
+          </p>
           <div className="flex items-baseline gap-3">
             <h3 className="text-4xl font-bold tracking-tight">{displayScore.toFixed(2)}</h3>
-            <span className={`font-semibold text-lg ${status.color}`}>
+            <span className={`font-semibold text-lg flex items-center ${status.color}`}>
               {status.label}
+              {status.label === 'Consensus' && <InfoTooltip termKey="consensus" />}
+              {status.label === 'High Conflict' && <InfoTooltip termKey="high_conflict" />}
             </span>
           </div>
         </div>
         <div className="text-right hidden sm:block">
-          <p className="text-sm font-medium text-muted-foreground mb-1">Highest Gap Pair</p>
+          <p className="text-sm font-medium text-muted-foreground mb-1 flex items-center justify-end">
+            Highest Gap Pair <InfoTooltip termKey="highest_gap_pair" />
+          </p>
           <p className="text-lg font-medium bg-secondary/50 px-3 py-1 rounded-md">{highestGapPair || "N/A"}</p>
         </div>
       </div>
