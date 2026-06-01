@@ -27,19 +27,17 @@ class InsiderAgent:
 
             if not trades:
                 return AgentOutput(
-                    agent=self.name, score=0.0, confidence=0.4,
-                    summary="No recent insider transactions found.",
+                    agent=self.name, score=0.0, confidence=0.3,
+                    summary=f"No recent insider transactions found for {self.ticker}.",
                     evidence=[]
                 )
 
-            # Aggregate buy vs sell activity
             buys  = [t for t in trades if t.transaction_type == "buy"]
             sells = [t for t in trades if t.transaction_type == "sell"]
             total_buy_value  = sum(t.total_value or 0 for t in buys)
             total_sell_value = sum(t.total_value or 0 for t in sells)
             net_value        = total_buy_value - total_sell_value
 
-            # Build evidence list for the prompt
             trade_lines = []
             for t in trades[:8]:
                 value_str = (
@@ -54,6 +52,25 @@ class InsiderAgent:
                     f"({value_str})"
                 )
 
+            # ── Pre-LLM fallback from buy/sell flows ─────────────────────
+            total_flow = total_buy_value + total_sell_value
+            raw_score = (
+                round(max(-1.0, min(1.0, net_value / total_flow)), 2)
+                if total_flow > 0 else 0.0
+            )
+            schema_fallback = {
+                "score":      raw_score,
+                "confidence": min(0.8, 0.3 + len(trades) / 20),
+                "summary": (
+                    f"{self.ticker} insider activity: {len(buys)} buy(s) "
+                    f"(${total_buy_value/1e6:.1f}M) vs {len(sells)} sell(s) "
+                    f"(${total_sell_value/1e6:.1f}M). "
+                    f"Net insider flow: ${net_value/1e6:+.1f}M."
+                ),
+                "evidence": [l[2:] for l in trade_lines[:5]],
+            }
+
+            # ── Build prompts ────────────────────────────────────────────
             system_prompt = (
                 "You are an insider trading analyst. Analyze insider transaction "
                 "data and return a JSON object with this exact shape: "
@@ -82,19 +99,20 @@ Confidence: based on volume of insider activity and recency.
 Evidence: cite specific transactions with names, amounts, and dates.
 """
 
-            result = await call_llm(system_prompt, user_prompt)
+            result = await call_llm(system_prompt, user_prompt, schema_fallback=schema_fallback)
 
             return AgentOutput(
                 agent=self.name,
-                score=float(result.get("score", 0.0)),
-                confidence=float(result.get("confidence", 0.6)),
-                summary=result.get("summary", ""),
-                evidence=result.get("evidence", [l[2:] for l in trade_lines[:5]]),
+                score=float(result.get("score", schema_fallback["score"])),
+                confidence=float(result.get("confidence", schema_fallback["confidence"])),
+                summary=result.get("summary") or schema_fallback["summary"],
+                evidence=result.get("evidence") or schema_fallback["evidence"],
             )
 
         except Exception as e:
             logger.error(f"[{self.ticker}] InsiderAgent failed: {e}")
             return AgentOutput(
                 agent=self.name, score=0.0, confidence=0.0,
-                summary=f"Analysis failed: {e}", evidence=[]
+                summary=f"Insider transaction data temporarily unavailable for {self.ticker}.",
+                evidence=[]
             )

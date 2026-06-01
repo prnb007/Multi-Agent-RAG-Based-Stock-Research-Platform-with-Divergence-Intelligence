@@ -19,25 +19,40 @@ _llm = ChatGroq(
     temperature=0.1,
 )
 
-_AGENT_FALLBACK = {
-    "score": 0.0,
-    "confidence": 0.0,
-    "summary": "Failed to parse LLM response",
-    "evidence": [],
-}
+async def call_llm(
+    system_prompt: str,
+    user_prompt: str,
+    schema_fallback: Optional[Dict] = None,
+) -> dict:
+    """
+    Standard LLM call expecting JSON output.
+    schema_fallback: pre-computed dict used verbatim when the LLM is
+    unavailable, returns garbage, or the response is empty.
+    """
+    fallback = schema_fallback or {}
+    try:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", user_prompt),
+        ])
+        chain = prompt | _llm
+        response = await chain.ainvoke({})
+        raw = response.content
 
-async def call_llm(system_prompt: str, user_prompt: str) -> dict:
-    """
-    Standard LLM call that expects JSON output.
-    Returns parsed dict with keys: score, confidence, summary, evidence.
-    """
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", user_prompt),
-    ])
-    chain = prompt | _llm
-    response = await chain.ainvoke({})
-    return parse_llm_json(response.content, fallback=_AGENT_FALLBACK)
+        if not raw or len(raw.strip()) < 10:
+            logger.warning("[LLM] Empty/minimal response — using pre-computed fallback")
+            return fallback
+
+        parsed = parse_llm_json(raw, fallback=fallback)
+
+        # If both critical fields are missing the LLM gave us nothing useful
+        if not parsed.get("summary") and parsed.get("score") is None:
+            return fallback
+
+        return parsed
+    except Exception as e:
+        logger.error(f"[LLM] call_llm exception: {e}")
+        return fallback
 
 class AgentOutput(BaseModel):
     agent: Optional[str] = Field(default=None, description="Name of the agent that produced this output")

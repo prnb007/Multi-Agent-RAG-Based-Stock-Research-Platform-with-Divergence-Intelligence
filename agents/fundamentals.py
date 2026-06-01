@@ -32,6 +32,33 @@ class FundamentalsAgent:
                 overview, income, balance, cashflow
             )
 
+            # ── Pre-LLM fallback from computed metrics ──────────────────
+            mcap_str = f"${overview.market_cap/1e9:.1f}B" if overview.market_cap else "N/A"
+            pe_str   = f"P/E {overview.pe_ratio:.1f}x" if overview.pe_ratio else None
+            nm_str   = f"net margin {metrics.net_margin:.1%}" if metrics.net_margin is not None else None
+
+            summary_parts = [
+                f"{overview.name} ({self.ticker}) — {overview.sector}.",
+                f"Pre-computed score: {metrics.overall_score:+.2f}.",
+                f"Market cap: {mcap_str}.",
+            ]
+            if pe_str:
+                summary_parts.append(pe_str + ".")
+            if nm_str:
+                summary_parts.append(nm_str.capitalize() + ".")
+
+            raw_evidence = (metrics.key_strengths + metrics.key_risks)[:6]
+            if not raw_evidence:
+                raw_evidence = [f"Market cap: {mcap_str}", f"Sector: {overview.sector}"]
+
+            schema_fallback = {
+                "score":      metrics.overall_score,
+                "confidence": 0.5,
+                "summary":    " ".join(summary_parts),
+                "evidence":   raw_evidence,
+            }
+
+            # ── Build prompts ────────────────────────────────────────────
             system_prompt = (
                 "You are a senior equity research analyst. Analyze a company's "
                 "fundamentals and return a JSON object with this exact shape: "
@@ -39,14 +66,11 @@ class FundamentalsAgent:
                 '"summary": "<2-3 sentences>", "evidence": ["bullet 1", "bullet 2", ...]}}'
             )
 
-            mcap_str = f"${overview.market_cap/1e9:.1f}B" if overview.market_cap else "N/A"
-            pe_str = f"{overview.pe_ratio:.2f}" if overview.pe_ratio else "N/A"
-            fpe_str = f"{overview.forward_pe:.2f}" if overview.forward_pe else "N/A"
-            nm_str = f"{metrics.net_margin:.1%}" if metrics.net_margin is not None else "N/A"
-            roe_str = f"{metrics.return_on_equity:.1%}" if metrics.return_on_equity is not None else "N/A"
+            fpe_str  = f"{overview.forward_pe:.2f}" if overview.forward_pe else "N/A"
+            roe_str  = f"{metrics.return_on_equity:.1%}" if metrics.return_on_equity is not None else "N/A"
             revg_str = f"{metrics.revenue_growth:.1%}" if metrics.revenue_growth is not None else "N/A"
-            earng_str = f"{metrics.earnings_growth:.1%}" if metrics.earnings_growth is not None else "N/A"
-            fcf_str = f"${metrics.free_cash_flow/1e9:.1f}B" if metrics.free_cash_flow is not None else "N/A"
+            earng_str= f"{metrics.earnings_growth:.1%}" if metrics.earnings_growth is not None else "N/A"
+            fcf_str  = f"${metrics.free_cash_flow/1e9:.1f}B" if metrics.free_cash_flow is not None else "N/A"
 
             user_prompt = f"""
 Analyze the fundamentals of {overview.name} ({self.ticker}).
@@ -54,9 +78,9 @@ Analyze the fundamentals of {overview.name} ({self.ticker}).
 KEY METRICS:
 - Sector: {overview.sector}
 - Market cap: {mcap_str}
-- P/E ratio: {pe_str}
+- P/E ratio: {overview.pe_ratio or "N/A"}
 - Forward P/E: {fpe_str}
-- Net margin: {nm_str}
+- Net margin: {nm_str or "N/A"}
 - Return on Equity: {roe_str}
 - Revenue growth: {revg_str}
 - Earnings growth: {earng_str}
@@ -77,19 +101,20 @@ Confidence should reflect how complete the data is.
 Evidence bullets should cite specific numbers from above.
 """
 
-            result = await call_llm(system_prompt, user_prompt)
+            result = await call_llm(system_prompt, user_prompt, schema_fallback=schema_fallback)
 
             return AgentOutput(
                 agent=self.name,
-                score=float(result.get("score", metrics.overall_score)),
-                confidence=float(result.get("confidence", 0.7)),
-                summary=result.get("summary", ""),
-                evidence=result.get("evidence", metrics.key_strengths + metrics.key_risks),
+                score=float(result.get("score", schema_fallback["score"])),
+                confidence=float(result.get("confidence", 0.5)),
+                summary=result.get("summary") or schema_fallback["summary"],
+                evidence=result.get("evidence") or schema_fallback["evidence"],
             )
 
         except Exception as e:
             logger.error(f"[{self.ticker}] FundamentalsAgent failed: {e}")
             return AgentOutput(
                 agent=self.name, score=0.0, confidence=0.0,
-                summary=f"Analysis failed: {e}", evidence=[]
+                summary=f"Financial data temporarily unavailable for {self.ticker}. Provider may be rate-limited.",
+                evidence=[]
             )

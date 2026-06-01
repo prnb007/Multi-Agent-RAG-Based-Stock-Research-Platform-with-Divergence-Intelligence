@@ -19,6 +19,25 @@ class TechnicalAgent:
     def __init__(self, ticker: str):
         self.ticker = ticker.upper()
 
+    @staticmethod
+    def _build_evidence(signals) -> list[str]:
+        ev = []
+        if signals.rsi is not None:
+            label = "overbought" if signals.rsi > 70 else "oversold" if signals.rsi < 30 else "neutral"
+            ev.append(f"RSI(14): {signals.rsi:.1f} — {label}")
+        if signals.macd is not None and signals.macd_signal is not None:
+            cross = "bullish crossover" if signals.macd > signals.macd_signal else "bearish crossover"
+            ev.append(f"MACD: {signals.macd:.3f} vs signal {signals.macd_signal:.3f} ({cross})")
+        if signals.trend:
+            ev.append(f"Trend: {signals.trend} (EMA20 vs EMA50)")
+        if signals.price_vs_bb:
+            ev.append(f"Price vs Bollinger Bands: {signals.price_vs_bb.replace('_', ' ')}")
+        if signals.six_month_return is not None:
+            ev.append(f"6-month return: {signals.six_month_return:+.2f}%")
+        if signals.volume_trend:
+            ev.append(f"Volume: {signals.volume_trend.replace('_', ' ')}")
+        return ev or ["Insufficient price data for detailed technical evidence."]
+
     async def analyze(self) -> AgentOutput:
         logger.info(f"[{self.ticker}] TechnicalAgent starting analysis...")
 
@@ -29,10 +48,38 @@ class TechnicalAgent:
             if signals.current_price is None:
                 return AgentOutput(
                     agent=self.name, score=0.0, confidence=0.0,
-                    summary="Insufficient price data for analysis",
+                    summary=f"Insufficient price data for {self.ticker} technical analysis.",
                     evidence=[]
                 )
 
+            # ── Pre-LLM fallback from indicator values ───────────────────
+            trend_word = signals.trend or "neutral"
+            rsi_note = ""
+            if signals.rsi is not None:
+                if signals.rsi > 70:
+                    rsi_note = f" RSI at {signals.rsi:.0f} (overbought)."
+                elif signals.rsi < 30:
+                    rsi_note = f" RSI at {signals.rsi:.0f} (oversold)."
+                else:
+                    rsi_note = f" RSI at {signals.rsi:.0f}."
+
+            return_note = (
+                f" 6-month return: {signals.six_month_return:+.1f}%."
+                if signals.six_month_return is not None else ""
+            )
+
+            schema_fallback = {
+                "score":      float(signals.momentum_score),
+                "confidence": 0.65,
+                "summary": (
+                    f"{self.ticker} technicals show a {trend_word} trend."
+                    f"{rsi_note}{return_note}"
+                    f" Price is {(signals.price_vs_bb or 'in band').replace('_', ' ')} vs Bollinger Bands."
+                ),
+                "evidence": self._build_evidence(signals),
+            }
+
+            # ── Build prompts ────────────────────────────────────────────
             system_prompt = (
                 "You are a technical analyst. Analyze technical indicators and return a JSON object "
                 "with this exact shape: "
@@ -73,19 +120,20 @@ Confidence: how strong and consistent the signals are.
 Evidence: cite specific numbers (RSI, MACD, position vs bands, etc.)
 """
 
-            result = await call_llm(system_prompt, user_prompt)
+            result = await call_llm(system_prompt, user_prompt, schema_fallback=schema_fallback)
 
             return AgentOutput(
                 agent=self.name,
-                score=float(result.get("score", signals.momentum_score)),
-                confidence=float(result.get("confidence", 0.7)),
-                summary=result.get("summary", ""),
-                evidence=result.get("evidence", []),
+                score=float(result.get("score", schema_fallback["score"])),
+                confidence=float(result.get("confidence", schema_fallback["confidence"])),
+                summary=result.get("summary") or schema_fallback["summary"],
+                evidence=result.get("evidence") or schema_fallback["evidence"],
             )
 
         except Exception as e:
             logger.error(f"[{self.ticker}] TechnicalAgent failed: {e}")
             return AgentOutput(
                 agent=self.name, score=0.0, confidence=0.0,
-                summary=f"Analysis failed: {e}", evidence=[]
+                summary=f"Price data temporarily unavailable for {self.ticker}. Provider may be rate-limited.",
+                evidence=[]
             )

@@ -30,16 +30,29 @@ class SentimentAgent:
 
             if not news:
                 return AgentOutput(
-                    agent=self.name, score=0.0, confidence=0.0,
-                    summary="No recent news available",
+                    agent=self.name, score=0.0, confidence=0.2,
+                    summary=f"No recent news found for {self.ticker}. Sentiment cannot be assessed.",
                     evidence=[]
                 )
 
-            # Pick top 8 most relevant headlines for the prompt
-            headlines = [
-                f"- {item.title}" for item in news[:8]
-            ]
+            headlines = [f"- {item.title}" for item in news[:8]]
 
+            # ── Pre-LLM fallback from sentiment aggregation ──────────────
+            raw_score = float(sentiment["avg_sentiment"])
+            schema_fallback = {
+                "score":      round(max(-1.0, min(1.0, raw_score)), 2),
+                "confidence": min(0.8, 0.3 + len(news) / 20),
+                "summary": (
+                    f"{overview.name} ({self.ticker}) — {len(news)} recent articles. "
+                    f"Sentiment: {sentiment['sentiment_label']} "
+                    f"({sentiment['positive_count']} positive, "
+                    f"{sentiment['negative_count']} negative, "
+                    f"{sentiment['neutral_count']} neutral)."
+                ),
+                "evidence": [h[2:] for h in headlines[:5]],
+            }
+
+            # ── Build prompts ────────────────────────────────────────────
             system_prompt = (
                 "You are a financial news analyst. Analyze sentiment from recent news "
                 "headlines and return a JSON object with this exact shape: "
@@ -66,19 +79,20 @@ Confidence should reflect how recent and varied the news coverage is.
 Evidence should cite specific headlines (4-5 most relevant).
 """
 
-            result = await call_llm(system_prompt, user_prompt)
+            result = await call_llm(system_prompt, user_prompt, schema_fallback=schema_fallback)
 
             return AgentOutput(
                 agent=self.name,
-                score=float(result.get("score", sentiment["avg_sentiment"])),
-                confidence=float(result.get("confidence", 0.7)),
-                summary=result.get("summary", ""),
-                evidence=result.get("evidence", [h[2:] for h in headlines[:5]]),
+                score=float(result.get("score", schema_fallback["score"])),
+                confidence=float(result.get("confidence", schema_fallback["confidence"])),
+                summary=result.get("summary") or schema_fallback["summary"],
+                evidence=result.get("evidence") or schema_fallback["evidence"],
             )
 
         except Exception as e:
             logger.error(f"[{self.ticker}] SentimentAgent failed: {e}")
             return AgentOutput(
                 agent=self.name, score=0.0, confidence=0.0,
-                summary=f"Analysis failed: {e}", evidence=[]
+                summary=f"Sentiment analysis temporarily unavailable for {self.ticker}. News provider may be rate-limited.",
+                evidence=[]
             )
