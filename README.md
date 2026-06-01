@@ -2,13 +2,9 @@
 
 **Multi-Agent AI Stock Research Platform with Divergence Intelligence**
 
-Built for [Nebula 2026](https://mdgspace.org) by MDG Space, IIT Roorkee — ML/AI Track, Finance Domain.
-
 🔗 **Live App:** [stocklens-peach.vercel.app](https://stocklens-peach.vercel.app)
 🔗 **API:** [web-production-b35b3.up.railway.app](https://web-production-b35b3.up.railway.app)
 🔗 **API Health:** [/health/providers](https://web-production-b35b3.up.railway.app/health/providers)
-
-> Try ticker **AAPL** for the most reliable demo path — it has pre-processed SEC narrative data and reliable provider coverage.
 
 ---
 
@@ -146,7 +142,7 @@ A second axis of analysis: **how does the company's own story change over time?*
 The Narrative Service:
 
 1. Fetches the last 4 quarters of 10-Q filings from SEC EDGAR
-2. Extracts the MD&A section using BeautifulSoup (with Part I isolation to avoid hitting the Internal Controls section)
+2. Extracts the MD&A section using BeautifulSoup
 3. Uses the **Signal Extractor** — an LLM-driven module — to pull out concrete claims about strategy, risks, opportunities, and concerns *with verbatim quotes*
 4. Stores extracted signals in SQLite (`narrative_signals.db`) so judges and demo users get instant load
 
@@ -160,7 +156,7 @@ Pre-processed tickers: **AAPL, NVDA, MSFT, META**.
 
 ### Backend
 - **Python 3.11** + **FastAPI** + **Uvicorn**
-- **Groq API** — `llama-3.3-70b-versatile` for all LLM calls (fast inference, generous free tier)
+- **Groq API** — `llama-3.3-70b-versatile` for all LLM calls 
 - **asyncio.gather** for parallel agent execution
 - **Server-Sent Events (SSE)** for streaming agent results to the client
 - **sentence-transformers** + **ChromaDB** for embeddings (used in narrative similarity)
@@ -350,27 +346,7 @@ This fetches the last 4 quarters of 10-Q filings, parses MD&A, and stores extrac
 
 ---
 
-## Engineering Notes
-
-A few decisions worth flagging for technical evaluators:
-
-- **Free-tier API limits as architectural constraint.** Alpha Vantage caps at 25 requests/day, FMP at 250/day, Finnhub at 60/min. The provider router and health monitor were not over-engineering — they were the only way to keep the demo working across provider failures. The system explicitly returns "partial analysis" with real partial data rather than synthetic placeholders when limits are hit.
-- **No mock data anywhere in the production path.** Every number rendered to the user originates from a real API call or a real SEC filing. When data is unavailable, the agent says so.
-- **LLM JSON parsing is hostile-by-default.** The `parse_llm_json` utility handles markdown fences, prose preambles, balanced-brace extraction, and smart fallbacks — because LLMs do all of these incorrectly on any given call.
-- **Narrative cache is committed to git.** `narrative_signals.db` ships with the deploy so reviewers don't have to wait for SEC filing parsing to see pre-processed examples.
-- **Synthesis agent has defensive normalization.** Earlier iterations broke when an agent returned a partial result; the synthesis layer now handles both dict and Pydantic forms and degrades gracefully.
-
----
-
 ## Repository
 
 [github.com/prnb007/Multi-Agent-RAG-Based-Stock-Research-Platform-with-Divergence-Intelligence](https://github.com/prnb007/Multi-Agent-RAG-Based-Stock-Research-Platform-with-Divergence-Intelligence)
 
----
-
-## Acknowledgments
-
-- **MDG Space, IIT Roorkee** for organizing Nebula 2026
-- **Groq** for fast LLM inference on the free tier
-- **SEC EDGAR** for keeping primary-source financial data open
-- The Finnhub, FMP, Alpha Vantage, and NewsAPI teams for the free tiers that made this possible
